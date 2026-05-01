@@ -1,0 +1,7 @@
+fastapi[standard]
+langchain
+pydantic
+sentence-transformers
+python-dotenv
+langchain-community
+langchain-core
