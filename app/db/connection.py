@@ -2,6 +2,7 @@
 
 import sqlite3
 from pathlib import Path
+import os
 
 import sqlite_vec
 
@@ -11,6 +12,7 @@ DB_PATH = BASE_DIR / "data" / "portfolio.db"
 
 
 def get_connection() -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
 

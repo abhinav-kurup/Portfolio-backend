@@ -1,7 +1,7 @@
 # app/db/schema.py
 
 from __future__ import annotations
-
+from app.db.connection import get_connection
 import sqlite3
 
 
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS documents (
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     source_path TEXT,
+    content_hash TEXT,
     metadata TEXT DEFAULT '{{}}'
 );
 """
@@ -45,51 +46,6 @@ CREATE TABLE IF NOT EXISTS blogs (
     metadata TEXT DEFAULT '{{}}'
 );
 """
-
-
-CONTACT_TABLE = f"""
-CREATE TABLE IF NOT EXISTS contact_messages (
-    {BASE_FIELDS},
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    message TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'new'
-);
-"""
-
-
-FAQ_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_faq_created_at
-ON faq(created_at);
-"""
-
-
-DOCUMENT_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_documents_type
-ON documents(doc_type);
-
-CREATE INDEX IF NOT EXISTS idx_documents_created_at
-ON documents(created_at);
-"""
-
-
-BLOG_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_blogs_slug
-ON blogs(slug);
-
-CREATE INDEX IF NOT EXISTS idx_blogs_published
-ON blogs(published);
-"""
-
-
-CONTACT_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_contact_status
-ON contact_messages(status);
-
-CREATE INDEX IF NOT EXISTS idx_contact_created_at
-ON contact_messages(created_at);
-"""
-
 
 FAQ_VEC = """
 CREATE VIRTUAL TABLE IF NOT EXISTS faq_vec
@@ -171,14 +127,6 @@ BEGIN
     SET updated_at = datetime('now')
     WHERE id = old.id;
 END;
-
-CREATE TRIGGER IF NOT EXISTS contact_set_updated_at
-AFTER UPDATE ON contact_messages
-BEGIN
-    UPDATE contact_messages
-    SET updated_at = datetime('now')
-    WHERE id = old.id;
-END;
 """
 
 
@@ -187,11 +135,6 @@ SCHEMA_SQL = "\n".join(
         FAQ_TABLE,
         DOCUMENTS_TABLE,
         BLOGS_TABLE,
-        CONTACT_TABLE,
-        FAQ_INDEXES,
-        DOCUMENT_INDEXES,
-        BLOG_INDEXES,
-        CONTACT_INDEXES,
         FAQ_VEC,
         DOC_VEC,
         DOC_FTS,
@@ -201,6 +144,11 @@ SCHEMA_SQL = "\n".join(
 )
 
 
-def create_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA_SQL)
-    conn.commit()
+def create_schema() -> None:
+       
+    conn = get_connection()
+    try:
+        conn.executescript(SCHEMA_SQL)
+        conn.commit()
+    finally:
+        conn.close()
