@@ -16,3 +16,4 @@ samp.txt
 portfolio.db
 uv.lock
 .python-version
+.env
