@@ -1,5 +1,3 @@
-# app/core/config.py
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -12,7 +10,7 @@ class Settings(BaseSettings):
     DB_PATH: str = "data/portfolio.db"
 
     # llm
-    PRIMARY_LLM_PROVIDER: str = "groq"          # anthropic / openai
+    PRIMARY_LLM_PROVIDER: str = "groq"         
     PRIMARY_LLM_MODEL: str = "llama-3.3-70b-versatile"
     PRIMARY_LLM_MAX_TOKENS: int = 1000
     PRIMARY_LLM_API_KEY: str = "None"
@@ -23,17 +21,16 @@ class Settings(BaseSettings):
     FALLBACK_LLM_API_KEY: str = "None"
 
     # embeddings
-    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"  # local, no API cost
+    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"  
     EMBEDDING_DIMENSIONS: int = 384
 
     # faq
-    FAQ_SIMILARITY_THRESHOLD: float = 0.85    # above this = FAQ hit
-
+    FAQ_SIMILARITY_THRESHOLD: float = 0.85    
     # retrieval
     MAX_CHUNKS_RETRIEVED: int = 3
 
     # security
-    ADMIN_API_KEY: str                         # required, no default
+    ADMIN_API_KEY: str                        
 
     # cors
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
@@ -41,7 +38,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"  # Allow extra fields in .env without crashing
+        extra="ignore" 
     )
 
 settings = Settings()
