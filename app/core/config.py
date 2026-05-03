@@ -3,6 +3,10 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # app
+    APP_ENV: str = "development"
+    DEBUG: bool = True
+
+    # database
     DB_PATH: str = "data/portfolio.db"
 
     # llm
@@ -26,11 +30,11 @@ class Settings(BaseSettings):
     MAX_CHUNKS_RETRIEVED: int = 3
 
     # security
-    # ADMIN_API_KEY: str = "default_admin_key"
+    ADMIN_API_KEY: str = "default_admin_key"
 
     # cors
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "https://huggingface.co/spaces/abhinavkurup/portfolio-backend/","https://abhinav-kurup.vercel.app/"]
-
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
