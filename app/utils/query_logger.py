@@ -1,8 +1,10 @@
 import json
 import os
 from datetime import datetime
+from typing import Any
+from fastapi.encoders import jsonable_encoder
 
-def log_interaction(query: str, reply: str, file_path: str = "data/chat_logs.json"):
+def log_interaction(query: Any, reply: Any, file_path: str = "data/chat_logs.json"):
     """
     Appends a user query and the corresponding reply to a JSON file.
     Creates the file and directory if they don't exist.
@@ -28,8 +30,8 @@ def log_interaction(query: str, reply: str, file_path: str = "data/chat_logs.jso
     # Append new interaction
     interaction = {
         "timestamp": datetime.now().isoformat(),
-        "query": query,
-        "reply": reply
+        "query": jsonable_encoder(query),
+        "reply": jsonable_encoder(reply)
     }
     data.append(interaction)
 

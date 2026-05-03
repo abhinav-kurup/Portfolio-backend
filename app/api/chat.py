@@ -1,7 +1,9 @@
 # app/api/chat.py
-
-from fastapi import APIRouter, Depends
+import os
+import json
+from fastapi import APIRouter, Depends, HTTPException
 from sqlite3 import Connection
+from app.utils.query_logger import log_interaction
 
 from app.db.connection import get_db
 from app.core.logging import setup_logging
@@ -27,5 +29,29 @@ def chat(
     payload: ChatRequest,
     db: Connection = Depends(get_db),
 ) -> ChatResponse:
+
     logger.info("Chat request received", extra={"payload": payload})
-    return run_chat_pipeline(payload, db)
+    response = run_chat_pipeline(payload, db)
+    log_interaction(payload, response)
+    return response
+
+@router.get(
+    "/logs",
+    summary="Retrieve chat logs",
+    description="Returns the chat logs stored in the JSON file.",
+)
+def get_chat_logs():
+    file_path = "data/chat_logs.json"
+    if not os.path.exists(file_path):
+        return {"logs": []}
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if content:
+                data = json.loads(content)
+                return {"logs": data}
+            return {"logs": []}
+    except Exception as e:
+        logger.error(f"Error reading chat logs: {e}")
+        raise HTTPException(status_code=500, detail="Could not read chat logs")
