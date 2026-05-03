@@ -1,0 +1,202 @@
+[
+  {
+    "question": "Can you tell me a bit about yourself?",
+    "answer": "I'm a backend-focused software engineer with around 2 years of experience building systems in Python. Most of my work has been around backend APIs, real-time systems, automation workflows, and cloud deployments. I've worked across product engineering, freelance systems, and internal platforms, mainly using Python, Django, FastAPI, PostgreSQL, AWS, and related tooling.",
+    "metadata": {
+      "category": "general",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "How much experience do you have?",
+    "answer": "I have around 2 years of hands-on experience working on backend systems, platform engineering, and cloud-based applications. My work has included product development, freelance backend systems, and enterprise platform engineering.",
+    "metadata": {
+      "category": "general",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What kind of roles are you targeting?",
+    "answer": "I'm primarily targeting backend and AI engineering roles where I can work on intelligent backend systems, LLM-powered applications, retrieval pipelines, and scalable APIs. My experience is strongest in Python-based backend development, and I'm especially interested in roles at the intersection of backend engineering, applied AI, and production-grade systems.",
+    "metadata": {
+      "category": "general",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What technologies do you work with the most?",
+    "answer": "I work mostly with Python, Django, FastAPI, PostgreSQL, Redis, Docker, and AWS. Depending on the project, I've also worked with WebSockets, Celery, LangGraph, ChromaDB, PostGIS, Jenkins, and cloud deployment tooling.",
+    "metadata": {
+      "category": "skills",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What kind of backend systems have you worked on?",
+    "answer": "I've worked on a mix of backend systems including real-time collaboration platforms, document intelligence systems, geospatial tracking tools, workforce management platforms, and enterprise automation systems. Most of them involved API design, backend workflows, database design, and production deployment.",
+    "metadata": {
+      "category": "experience",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What is CollabWrite?",
+    "answer": "CollabWrite is a real-time collaborative editing system built around FastAPI, WebSockets, and a custom CRDT-based synchronization model. It was designed to support low-latency shared editing where multiple users can work on the same document at the same time without conflicts.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What was technically interesting about CollabWrite?",
+    "answer": "The most interesting part of CollabWrite was building the real-time collaboration layer. It used WebSockets for low-latency updates, a custom CRDT model for conflict-free concurrent editing, and in-memory state management to keep document updates fast while still syncing safely back to PostgreSQL.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What is DocuMind?",
+    "answer": "DocuMind is a document intelligence system built to answer questions over uploaded files using Retrieval-Augmented Generation. It combines document chunking, embeddings, vector search, and LLM-based reasoning to generate grounded answers with citations.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "How does DocuMind work?",
+    "answer": "DocuMind processes uploaded documents by splitting them into chunks, generating embeddings, storing them in a local vector store, retrieving relevant context during search, and then using an LLM to generate answers grounded in the retrieved content. It also adds source citations so answers stay traceable.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What was the biggest challenge in DocuMind?",
+    "answer": "One of the biggest challenges was keeping retrieval quality consistent. Complex queries often pulled noisy or duplicate context, so the retrieval flow had to be structured carefully with query planning, deduplication, and stricter citation control to keep responses grounded and useful.",
+    "metadata": {
+      "category": "projects",
+      "priority": "medium"
+    }
+  },
+  {
+    "question": "What is E-Beat?",
+    "answer": "E-Beat is a geospatial operations platform built for law enforcement workflows. It was designed to support location-aware field operations, spatial task assignment, operational visibility, and hierarchical region-based tracking across field teams and management.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "How did the E-Beat project start?",
+    "answer": "The E-Beat project started after my team won a Goa Police hackathon conducted at my college. We proposed a practical approach for improving operational workflows, and after the win, we were brought in to help build the production system.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What was your role in E-Beat?",
+    "answer": "I worked on backend engineering for E-Beat, mainly around geospatial workflows, backend logic, spatial data handling, and operational system design. A large part of the work involved building systems that could handle region-aware workflows and live operational coordination.",
+    "metadata": {
+      "category": "projects",
+      "priority": "medium"
+    }
+  },
+  {
+    "question": "What is the Workforce and Event Management Platform?",
+    "answer": "It was a cloud-based workforce and event management platform built for an operations-heavy business. The system handled workforce allocation, attendance, shift coordination, event execution, and operational tracking through a centralized backend platform.",
+    "metadata": {
+      "category": "projects",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What did you work on in the Workforce and Event Management Platform?",
+    "answer": "I worked on backend systems for operational workflows, asynchronous processing, reporting, real-time device communication, deployment infrastructure, and cloud-based backend operations for the platform.",
+    "metadata": {
+      "category": "projects",
+      "priority": "medium"
+    }
+  },
+  {
+    "question": "What kind of cloud experience do you have?",
+    "answer": "Most of my cloud experience has been around AWS, including ECS, ECR, CodeDeploy, S3, Lambda, and deployment automation. I've worked on containerized deployments, asynchronous systems, and production infrastructure for backend services.",
+    "metadata": {
+      "category": "skills",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Have you worked with real-time systems?",
+    "answer": "Yes, I've worked on multiple real-time systems involving WebSockets, live synchronization, and event-driven communication. That includes collaborative editing systems, hardware-synced dashboards, and live operational tracking workflows.",
+    "metadata": {
+      "category": "skills",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Have you worked with databases at scale?",
+    "answer": "Yes, most of my backend work has involved designing and working with production databases, mainly PostgreSQL. That has included schema design, relational modeling, query optimization, spatial data handling, and designing around write-heavy workloads.",
+    "metadata": {
+      "category": "skills",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Do you have DevOps experience?",
+    "answer": "Yes, I've worked on CI/CD pipelines, containerized deployments, cloud infrastructure, and release workflows. That includes Jenkins-based pipelines, Dockerized services, AWS deployments, and deployment automation for production systems.",
+    "metadata": {
+      "category": "skills",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What are you currently working on?",
+    "answer": "I'm currently contributing to an enterprise automation platform focused on large-scale business process automation and platform reliability. My work is mainly around platform components, backend workflows, and supporting deployment and infrastructure reliability.",
+    "metadata": {
+      "category": "experience",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "What are your strengths as an engineer?",
+    "answer": "My strengths are backend system design, practical problem solving, and building reliable systems that can scale. I'm strongest in Python backend development, database-heavy workflows, and turning operational requirements into maintainable backend systems.",
+    "metadata": {
+      "category": "general",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Are you AWS certified?",
+    "answer": "Yes, I hold an AWS certification and have practical experience applying AWS services in production systems, especially around backend infrastructure, deployments, storage, and cloud-native workflows.",
+    "metadata": {
+      "category": "certification",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Which AWS services have you worked with?",
+    "answer": "I've worked with AWS services mainly in backend and deployment workflows, including ECS, ECR, CodeDeploy, S3, Lambda, EC2, and Application Load Balancers. Most of that experience has been around deploying and operating backend systems in production.",
+    "metadata": {
+      "category": "certification",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "How do you use AWS in your projects?",
+    "answer": "I've mainly used AWS for deploying backend services, managing containerized workloads, handling storage, and supporting cloud-based automation workflows. That includes running services on ECS, storing assets in S3, managing deployments through CodeDeploy, and supporting asynchronous workloads with Lambda.",
+    "metadata": {
+      "category": "certification",
+      "priority": "high"
+    }
+  },
+  {
+    "question": "Does your AWS certification help in your backend work?",
+    "answer": "Yes, it helped formalize a lot of the cloud concepts I was already using in practice. It strengthened my understanding of AWS architecture, deployment patterns, networking, and infrastructure decisions that directly apply to backend systems.",
+    "metadata": {
+      "category": "certification",
+      "priority": "medium"
+    }
+  }
+]

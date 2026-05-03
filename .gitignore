@@ -9,7 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-data
+test_groq.py
+test_pipeline.py
 prd-backend.md
 pyproject.toml
 samp.txt

@@ -1,0 +1,536 @@
+[
+    {
+        "doc_type": "architecture",
+        "title": "Real-Time Collaborative Editing Architecture",
+        "content": "The backend uses FastAPI WebSockets and an in-memory connection manager to handle real-time editing. Rather than using stateless REST APIs, the app keeps long-lived WebSocket connections open to track active documents, cursors, and user presence. The central connection manager takes care of broadcasting changes and syncing state between multiple users who are editing the same document. It broadcasts small state updates while keeping the full document state in memory so it can be accessed instantly without lag.",
+        "metadata": {
+            "project": "CollabWrite",
+            "stack": [
+                "FastAPI",
+                "WebSockets",
+                "PostgreSQL"
+            ],
+            "domain": "real-time collaboration"
+        }
+    },
+    {
+        "doc_type": "database_design",
+        "title": "Database Optimization for High-Frequency Edits",
+        "content": "Writing to the database on every single keystroke would create a massive bottleneck. To avoid this, the system doesn't save every change straight to PostgreSQL. Instead, it holds the live document state in memory inside the WebSocket connection manager. A background async task runs every 10 seconds to grab the latest JSON CRDT state and save it to the database, bumping the version number. This cuts down heavily on disk writes and database locks, while still making sure the document is safely stored over time.",
+        "metadata": {
+            "project": "CollabWrite",
+            "stack": [
+                "FastAPI",
+                "WebSockets",
+                "PostgreSQL"
+            ],
+            "domain": "real-time collaboration"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Preventing Async Loop Blocking with ML Inference",
+        "content": "Adding the Hugging Face T5 model for text paraphrasing created a real problem: running heavy machine learning tasks right inside FastAPI route handlers would block the main asyncio event loop. This would freeze up all the active WebSocket connections. To fix this, model loading and inference were moved to a separate thread pool using `asyncio.get_event_loop().run_in_executor()`. Offloading this work means the heavy text generation tasks don't block the real-time document editing.",
+        "metadata": {
+            "project": "CollabWrite",
+            "stack": [
+                "FastAPI",
+                "WebSockets",
+                "PostgreSQL"
+            ],
+            "domain": "real-time collaboration"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Custom CRDT Implementation for Conflict Resolution",
+        "content": "To let multiple people edit at the same time without locking the document, the backend uses a custom Conflict-Free Replicated Data Type (CRDT). The data structure maps every single character to a unique `Position` object that holds a `site_id`, a local `counter`, and a `timestamp` as a tie-breaker. If two users type at the exact same spot at the exact same time, the system compares these values to make sure the characters show up in the same order for everyone. This avoids the headaches of Operational Transformation (OT) and means the server doesn't have to lock the document.",
+        "metadata": {
+            "project": "CollabWrite",
+            "stack": [
+                "FastAPI",
+                "WebSockets",
+                "PostgreSQL"
+            ],
+            "domain": "real-time collaboration"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "WebSocket Connection Lifecycle and Memory Leak Prevention",
+        "content": "Handling long-running WebSocket connections led to issues with memory leaks and 'ghost' cursors staying on screen when a user's internet dropped without closing the connection cleanly. To solve this, the connection manager uses a heartbeat system. It tracks the last time a session was active and runs an async cleanup task every 60 seconds to check on everyone. If a session hasn't sent a heartbeat in over 5 minutes, the system removes them, frees up the memory, and lets the other users know that person left.",
+        "metadata": {
+            "project": "CollabWrite",
+            "stack": [
+                "FastAPI",
+                "WebSockets",
+                "PostgreSQL"
+            ],
+            "domain": "real-time collaboration"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Multi-Agent Workflow Orchestration using LangGraph",
+        "content": "The system implements a stateful, multi-agent Retrieval-Augmented Generation (RAG) architecture using LangGraph to process document queries deterministically. Instead of a linear chain, the orchestrator defines specific execution nodes (Router, Retrieval, Extraction, Analysis) that transition based on conditional edges. A centralized 'AgentState' object tracks the query, retrieved documents, extracted data, and step-by-step audit logs. This design isolates concerns—for example, the extraction agent strictly pulls structured tabular data while the analysis agent handles narrative generation with citations—ensuring that intermediate failures do not crash the entire pipeline and can be recovered or logged explicitly.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "FastAPI",
+                "LangGraph",
+                "Python",
+                "LLMs"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "database_design",
+        "title": "Vector Store Schema and Metadata Indexing Strategy",
+        "content": "The system uses ChromaDB for local vector storage to ensure complete offline capability and eliminate third-party API dependencies. The database schema focuses on granular metadata indexing alongside 'all-MiniLM-L6-v2' embeddings. During ingestion, each document chunk is enriched with a relational-style metadata payload including 'doc_id', 'page_number', 'chunk_index', and 'source' filename. This design decision prioritizes metadata filtering capabilities during similarity search. A tradeoff of this flat vector schema is the inability to perform complex graph-based relationship queries; however, by enforcing strict metadata constraints at the chunking layer, the system successfully supports precise page-level citations and multi-document filtering without the overhead of a dedicated relational database.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "ChromaDB",
+                "Python"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "retrieval_strategy",
+        "title": "Query Planning and Deduplication to Mitigate Context Pollution",
+        "content": "A major challenge in the retrieval pipeline was handling complex user queries that yielded poor semantic matches in a single pass. To solve this, the retrieval agent implements an LLM-based query planner that breaks complex inputs into 1-3 targeted sub-queries. However, executing multiple searches against the same ChromaDB collection introduced a new problem: context window pollution via duplicate chunk retrieval. The system solves this by computing MD5 hashes of the retrieved chunk contents and filtering out duplicates before ranking. The tradeoff here is a slight increase in computational overhead during the retrieval phase, which is justified by the significant improvement in context density and the reduction of token usage during final response generation.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "Python",
+                "LLMs",
+                "ChromaDB"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "system_design",
+        "title": "Query Classification and Graceful Degradation in Local LLMs",
+        "content": "Relying on smaller local LLMs for agentic routing presented a reliability challenge: the LLM would occasionally fail to parse the prompt or return a malformed classification, breaking the LangGraph state transitions. The system mitigates this by implementing a two-tier routing architecture. It first attempts an LLM-based classification to route queries as 'document' or 'conversational'. If the structured output parsing fails or the LLM hallucinates an invalid route, the system gracefully degrades to a deterministic, keyword-based heuristic fallback. This tradeoff sacrifices some nuance in edge-case routing but guarantees that the system remains stable and prevents the orchestrator from entering an unrecoverable state.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "LangGraph",
+                "LLMs",
+                "Python"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "generation_guardrails",
+        "title": "Enforcing Strict Citations and Mitigating Hallucinations",
+        "content": "Ensuring that the final output accurately cited local documents without hallucinating sources was a primary challenge. The 'AnalysisAgent' constructs a prompt context that explicitly injects the source filename and page number into each chunk header. To prevent the LLM from citing internal system variables, the system prompt includes strict guardrails forbidding the model from citing '[Extracted Data]' as a source. Instead, the model is forced to map the extracted structured data back to the original document metadata provided in the context blocks, resulting in deterministic and verifiable '[Source X (Page Y)]' citations for every claim.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "LLMs",
+                "Prompt Engineering"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "extraction_architecture",
+        "title": "Decoupling Structured Extraction from Narrative Generation",
+        "content": "A significant design challenge was extracting precise tabular data while simultaneously generating conversational answers; LLMs often struggled to do both accurately in a single pass. The system solves this by decoupling the tasks into two distinct LangGraph nodes: an 'ExtractionAgent' and an 'AnalysisAgent'. The extraction agent first isolates and formats structural data from the context. This structured output is then explicitly injected into the context window of the downstream analysis agent. This architectural tradeoff increases overall inference latency by requiring two sequential LLM calls, but it dramatically reduces hallucinations and ensures that tabular data is presented accurately within a natural language response.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "LangGraph",
+                "LLMs"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "implementation_detail",
+        "title": "Recursive Character Splitting for Semantic Completeness",
+        "content": "To ensure that vector embeddings capture semantically complete concepts, the document processing layer implements LangChain's RecursiveCharacterTextSplitter. The system is explicitly configured with a chunk_size of 2000 characters and a chunk_overlap of 200 characters to target approximately 500 tokens per chunk. This specific overlap parameter was implemented to prevent structural data, such as sentences or small tables spanning across chunk boundaries, from being orphaned during the embedding process, thereby reducing retrieval fragmentation.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "LangChain",
+                "Python"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "implementation_detail",
+        "title": "Handling NotImplementedError for Local LLM Structured Outputs",
+        "content": "When integrating local models via Ollama for query planning, a technical friction arose: not all smaller models support native function calling or structured JSON outputs via LangChain's with_structured_output. To solve this, the RetrievalAgent implements a graceful degradation pattern. During initialization, it attempts to wrap the LLM with a Pydantic SearchPlan schema. If a NotImplementedError is thrown by the provider, the system catches it, sets the structured LLM to None, and automatically falls back to bypassing the LLM query planner and treating the raw user query as a single-element list. This ensures the application remains functional regardless of the specific local model running.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "LangChain",
+                "Ollama",
+                "Pydantic"
+            ],
+            "domain": "AI / Document Intelligence"
+        }
+    },
+    {
+        "doc_type": "implementation_detail",
+        "title": "Appending Structured Traces to JSONL Audit Logs",
+        "content": "To meet the project's explainability requirements without requiring a heavy external database, the AuditLogger implements a custom JSONL append-only log strategy. When an agent completes its node execution, it yields a dictionary payload containing step names, latency, token counts, and potential error strings. The AuditLogger intercepts this payload, merges it with the query's UUID and a UTC timestamp, and appends it as a single flat string to 'audit_trail_steps.jsonl' using UTF-8 encoding.",
+        "metadata": {
+            "project": "DocuMind",
+            "stack": [
+                "Python",
+                "Logging"
+            ],
+            "domain": "Backend Engineering"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Hierarchical Geospatial Boundary Architecture",
+        "content": "The system models administrative boundaries using PostGIS PolygonFields to enforce strict spatial enclosures across hierarchical levels (State, District, Sub-Division, Police Station, Beat Area). The backend utilizes GEOSGeometry and Shapely for topological validations during record creation or modification. Custom save hooks intercept boundary changes, enforcing that a child boundary (e.g., Beat Area) must reside entirely within its parent's polygon using a 'within(tolerence_region)' validation. To mitigate floating-point inaccuracies and sliver polygons during spatial modifications, the system performs coordinate rounding to six decimal places and utilizes Shapely's snap, unary_union, and difference operations. This prevents topological errors from accumulating across boundary splits or merges.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostGIS",
+                "Shapely",
+                "GEOSGeometry",
+                "PostgreSQL"
+            ],
+            "domain": "geospatial tracking",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "database",
+        "title": "Hybrid Database Design for High-Frequency Tracking",
+        "content": "To support high-frequency live tracking of field officers without overwhelming the primary relational database, the system employs a hybrid database architecture. Django and PostGIS serve as the authoritative source for relational metadata, hierarchical authorization, and geospatial polygons. However, rather than persisting frequent coordinate updates into PostgreSQL—which would cause severe write amplification and lock contention—the backend initializes a unique node per officer on Firebase Realtime Database upon officer creation. Mobile clients stream telemetry directly to Firebase, enabling real-time map syncing, while Django handles the persistence of discrete, high-value events such as Points of Interest (POI) visits and court order executions.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "Firebase Realtime Database",
+                "PostGIS"
+            ],
+            "domain": "geospatial tracking",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Optimistic Workflow State Machine for POI Data",
+        "content": "The system implements an optimistic approval workflow for crowd-sourced or officer-sourced Point of Interest (POI) data, such as persons or locations. Instead of modifying production tables directly, the backend uses abstract base models (AddEditBaseModel) acting as an append-only staging table. An overloaded save() method functions as a state machine: when an administrator updates the approval_status to 'APPROVED', the hook intercepts the transaction and automatically applies the payload to the canonical LocationModel or PersonModel. This write-ahead logic prevents intermediate or unverified state pollution in production tables while maintaining an immutable audit log of requested changes.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostgreSQL"
+            ],
+            "domain": "state machine workflow",
+            "priority": "medium"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Automated Image Compression for Low-Bandwidth Networks",
+        "content": "Field officers frequently operate in low-bandwidth areas, causing high-resolution POI image uploads to fail or severely delay map rendering. To address this, an automated image optimization pipeline was implemented via Django post_save signals. Upon saving a new POI, the signal reads the image into a BytesIO stream using Pillow, corrects any unintended EXIF orientation rotations, downsizes the resolution by 50%, and applies JPEG compression at a 50% quality threshold. The optimized asset is saved adjacently as a 'compressed_image' via ContentFile. This reduced payload sizes significantly, ensuring reliable syncs over 3G/4G networks without requiring client-side compression logic.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "Pillow",
+                "PostgreSQL"
+            ],
+            "domain": "media optimization",
+            "priority": "medium"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Spatial Allocation Constraints for Court Order Executions",
+        "content": "The system routes the execution of court orders (Warrants, Summons, Notices) through a spatially constrained assignment engine. The CourtOrderModel binds legal workflows directly to geospatial regions by enforcing that an assigned officer must belong to a PoliceStationModel that geographically encompasses the target execution address. Validation logic intercepts assignments to inactive officers or cross-jurisdictional assignments, ensuring that operational legal tasks strictly map to the corresponding administrative spatial hierarchy established in the PostGIS database.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostGIS"
+            ],
+            "domain": "workflow automation",
+            "priority": "low"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Resolving Topology Errors in Dynamic Boundary Splitting",
+        "content": "During the dynamic splitting and merging of administrative polygons, floating-point inaccuracies introduced severe topology errors, such as self-intersecting polygons or disconnected slivers. Relying solely on standard geometric intersections caused transaction failures when aligning adjacent boundaries. The solution involved utilizing Shapely's 'snap' operation with a strict 1e-6 tolerance threshold before computing intersections or differences. Furthermore, a custom coordinate rounding algorithm was introduced to forcefully truncate complex polygon vertices to six decimal places, ensuring that edge boundaries shared exact mathematical parity across adjacent regions. This eliminated floating-point drift and stabilized the polygon-modification endpoints.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Shapely",
+                "PostGIS",
+                "GEOSGeometry"
+            ],
+            "domain": "geospatial tracking",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "project_background",
+        "title": "How the E-Beat Project Started and Shipped into production",
+        "content": "The E-Beat project originated from a hackathon conducted by Goa Police at Abhinav's college. The team won the hackathon by proposing a practical approach to modernizing operational workflows used by law enforcement teams. Following the win, the team was brought in to help build the actual system. The project focused on replacing manual and fragmented operational processes with a centralized platform that could be used by both field officers and higher-level management. The system was designed to improve coordination, reporting, and operational visibility across different levels of the organization. This django project was shipped into production with 1000+ field officers using it",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostgreSQL",
+                "AWS"
+            ],
+            "domain": "law enforcement operations",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Hierarchical Geospatial Boundary Architecture",
+        "content": "The backend uses PostGIS to enforce strict rules for hierarchical spatial boundaries, ensuring that a smaller zone is completely inside its larger parent zone. It intercepts database saves and checks boundary intersections using geometric functions. A major issue was that modifying these boundaries caused tiny overlaps or gaps due to floating-point errors. This was solved by rounding coordinates to six decimal places and using 'snap' and 'union' functions to ensure the boundaries lined up perfectly without topology errors.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostGIS",
+                "Shapely"
+            ],
+            "domain": "geospatial processing",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "database",
+        "title": "Hybrid Database Design for High-Frequency Tracking",
+        "content": "To handle high-frequency live location tracking without crashing the main relational database, the system uses a hybrid approach. The main database handles structured data, authorization, and spatial polygons. However, saving constant coordinate updates directly would cause massive write locks. Instead, the backend creates a unique node for each tracked entity in a real-time NoSQL database. Mobile clients stream their data directly there for live map syncing, while the main database only stores discrete, important events.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "Firebase",
+                "PostgreSQL"
+            ],
+            "domain": "real-time tracking",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Optimistic Workflow State Machine for Spatial Data",
+        "content": "The system features a moderation workflow for user-submitted spatial data. Instead of updating production tables directly, submissions are saved to an abstract staging table. When an admin approves the request, a custom save hook intercepts the transaction and automatically applies the changes to the main production tables. This write-ahead approach prevents unverified data from polluting the main system while keeping a permanent audit trail of all requested changes.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostgreSQL"
+            ],
+            "domain": "data moderation",
+            "priority": "medium"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Automated Image Compression for Low-Bandwidth Networks",
+        "content": "Mobile clients operating in low-bandwidth areas often struggled to upload or download high-resolution images, causing app delays. To fix this, an automated image compression pipeline was built using database save signals. When a new image is uploaded, the backend reads it into memory, fixes any unintended rotation issues from EXIF data, halves the resolution, and applies JPEG compression. The optimized image is saved alongside the original, cutting down payload sizes so the app remains fast on slow networks.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "Pillow",
+                "PostgreSQL"
+            ],
+            "domain": "media optimization",
+            "priority": "medium"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Spatial Allocation Constraints for Task Workflows",
+        "content": "The system assigns operational tasks based on geospatial boundaries. A task can only be assigned to a user whose designated operational zone completely covers the target address of the task. The database models include validation logic that blocks task assignments to inactive users or cross-jurisdictional areas, ensuring that all workflows strictly follow the geographical rules stored in the spatial database.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Django",
+                "PostGIS"
+            ],
+            "domain": "workflow automation",
+            "priority": "low"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Resolving Topology Errors in Dynamic Boundary Splitting",
+        "content": "When splitting and merging complex polygon boundaries dynamically, the system encountered severe topology errors like self-intersecting lines and disconnected slivers. Relying solely on standard geometric intersections caused the database transactions to fail. This was overcome by adding a strict tolerance threshold and 'snapping' adjacent boundaries together before calculating differences or intersections. By mathematically forcing complex polygon edges to share exact coordinates, the system eliminated floating-point drift and made dynamic polygon edits stable.",
+        "metadata": {
+            "project": "E-Beat",
+            "stack": [
+                "Shapely",
+                "PostGIS"
+            ],
+            "domain": "geospatial processing",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "project_background",
+        "title": "Workforce and Event Management Platform Overview",
+        "content": "This project was built as a cloud-based workforce and event management platform for an operations-driven business that needed a more centralized and scalable system. The platform was designed to manage workforce allocation, event assignments, attendance tracking, shift coordination, and operational workflows from a single system. It replaced fragmented manual coordination with a cloud-hosted platform that improved visibility, scheduling, and execution across teams. The backend was structured to support operational scale, asynchronous workflows, and centralized management across multiple ongoing events. This project was a freelance project shipped into production.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform",
+            "stack": [
+                "Django",
+                "PostgreSQL",
+                "AWS",
+                "SQS",
+                "Lambda"
+            ],
+            "domain": "Workforce and Event Management Platform - Freelance",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "architecture",
+        "title": "Asynchronous Task Processing and Reporting Engine",
+        "content": "The backend utilizes Celery with Redis as the message broker to offload heavy I/O operations, such as PDF report generation and bulk data exports. Generating comprehensive event reports involves combining structured database records with external binary assets retrieved from AWS S3. To prevent HTTP timeout issues and memory bloat during these operations, the system employs in-memory buffering using Python's BytesIO and merges documents via PyPDF. Once processing completes, the worker uploads the final artifact back to S3 and triggers a dedicated notification via database triggers, ensuring the frontend receives asynchronous feedback without blocking the main event loop.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "Django",
+                "Celery",
+                "Redis",
+                "AWS S3",
+                "ReportLab",
+                "PyPDF"
+            ],
+            "domain": "background processing",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "deployment_architecture",
+        "title": "Blue-Green Deployment Pipeline on AWS ECS",
+        "content": "The deployment pipeline used GitHub Actions, Amazon ECR, AWS CodeDeploy, and ECS on EC2 to implement Blue-Green deployments for the main backend service. On each production release, GitHub Actions built and pushed the Docker image to ECR, then triggered CodeDeploy to orchestrate a Blue-Green rollout on ECS. The service was fronted by an Application Load Balancer with separate target groups for active and replacement task sets. During deployment, CodeDeploy launched a new ECS task set on the green environment, registered it with the secondary target group, and gradually shifted traffic from blue to green through the load balancer. This allowed the new version to be validated under real traffic before fully cutting over, enabling zero-downtime releases for the primary backend. For supporting services where full Blue-Green was unnecessary, deployments followed a simpler rolling update path with rollback enabled through ECS task revision rollback and load balancer health checks. This setup reduced release risk, allowed near-instant rollback by switching traffic back to the previous task set, and significantly reduced recovery time during failed deployments.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "GitHub Actions",
+                "Docker",
+                "Amazon ECR",
+                "AWS CodeDeploy",
+                "Amazon ECS",
+                "EC2",
+                "ALB"
+            ],
+            "domain": "deployment infrastructure",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "real_time_communication",
+        "title": "Hardware-Synchronized WebSocket Architecture",
+        "content": "Real-time communication is managed via Django Channels with a Redis-backed channel layer. The system handles direct WebSocket connections from individual hardware attendance devices, isolating each connection into a specific group identifier. A separate consumer listens to a global device status group to broadcast real-time state updates to the frontend dashboard. To manage concurrency between the async event loop and synchronous ORM, the implementation wraps all database interactions with thread-pool decorators. The primary challenge was preventing stale connection states; this was mitigated by implementing a strict ping/ack heartbeat mechanism and explicitly managing connect/disconnect hooks to toggle device online/offline states deterministically.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "Django Channels",
+                "WebSockets",
+                "Redis",
+                "Asyncio"
+            ],
+            "domain": "real-time synchronization",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "database",
+        "title": "Relational Data Modeling and Query Optimization",
+        "content": "The PostgreSQL database schema is heavily normalized to manage complex relationships between employees, attendance hardware, and event management entities. The event structure acts as an aggregate root, linking to payments, tasks, and deliverables. To mitigate severe N+1 query performance degradation during bulk exports and PDF generation, the data access layer relies on explicit query set optimization. The implementation utilizes eager loading for foreign key relationships and reverse many-to-many lookups. This design tradeoff increases initial memory consumption for the fetched querysets but drastically reduces database round-trips, ensuring predictable execution time for background workers.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "PostgreSQL",
+                "Django ORM",
+                "Relational Database"
+            ],
+            "domain": "data modeling",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "engineering_challenge",
+        "title": "Overcoming Memory Exhaustion in Bulk ZIP Exports",
+        "content": "A significant technical challenge emerged when exporting guest data and associated ID proofs for large events. Initially, pulling hundreds of images from external storage and creating a ZIP archive would lead to worker out-of-memory constraints. The solution involved redesigning the archive generation to stream data dynamically. Instead of loading all files into memory concurrently, the system opens an archive stream over an in-memory buffer, iterating sequentially through database querysets. It reads individual files over the network, writes them immediately to the archive stream, and flushes memory. The final buffer is directly streamed back to cloud storage, bypassing local disk I/O completely. This compromise slightly increases overall processing latency due to sequential fetching but completely stabilizes memory utilization.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "Celery",
+                "Python zipfile",
+                "AWS S3",
+                "BytesIO"
+            ],
+            "domain": "resource optimization",
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "security_auth",
+        "title": "Role-Based Access Control and WebSocket Handshakes",
+        "content": "Authentication relies on stateless JWTs utilizing access and sliding refresh tokens. The system implements strict rotation and blacklisting of refresh tokens to prevent replay attacks. At the WebSocket layer, standard HTTP middleware cannot authorize connections seamlessly, so authentication is handled during the initial handshake by resolving the session context before upgrading the connection protocol. Consumers explicitly enforce Role-Based Access Control (RBAC); for instance, specific administrative channels aggressively terminate connections if the authenticated user lacks director-level privileges, ensuring that unprivileged clients cannot intercept broad administrative broadcasts.",
+        "metadata": {
+            "project": "Workforce and Event Management Platform - Freelance",
+            "stack": [
+                "Django REST Framework",
+                "JWT",
+                "WebSockets"
+            ],
+            "domain": "authentication & authorization",
+            "priority": "medium"
+        }
+    },
+    {
+        "doc_type": "experience",
+        "title": "Associate Software Engineer",
+        "content": "Currently contributing to an enterprise automation platform designed to support large-scale business process automation and operational execution across enterprise environments. The role has involved working on platform-level components, improving system reliability, and contributing to workflow-driven backend processes that support scalable automation. In addition to platform engineering, the work has also included contributions to the DevOps architecture by supporting CI/CD workflows, build automation, and deployment reliability across internal environments using Jenkins, AWS, Azure, and containerized infrastructure. This has involved maintaining delivery pipelines, improving deployment consistency, and supporting infrastructure workflows that enable stable and repeatable releases across teams.",
+        "metadata": {
+            "project": "Enterprise Automation Platform",
+            "stack": [
+                "Jenkins",
+                "AWS",
+                "Azure",
+                "Docker",
+                "CI/CD"
+            ],
+            "domain": "enterprise platform engineering",
+            "priority": "low"
+        }
+    },
+    {
+        "doc_type": "profile",
+        "title": "Professional Background",
+        "content": "Abhinav Kurup is a backend-focused software engineer with around 2 years of experience building Python-based systems across backend engineering, cloud infrastructure, and applied AI workflows. His work has focused on APIs, real-time systems, retrieval pipelines, automation platforms, and production backend services. He has built systems across collaborative editing, geospatial operations, document intelligence, workforce platforms, and enterprise automation, with multiple backend systems shipped into production and used in live operational environments. His strongest areas are Python backend development, system design, database-heavy workflows, and building scalable backend systems with practical cloud infrastructure. He is primarily targeting backend and AI engineering roles focused on intelligent systems, LLM-powered applications, and production-grade backend architecture.",
+        "metadata": {
+            "stack": [
+                "Python",
+                "Django",
+                "FastAPI",
+                "PostgreSQL",
+                "AWS",
+                "LLMs"
+            ],
+            "domain": "professional background",
+            "priority": "high"
+        }
+    }
+]

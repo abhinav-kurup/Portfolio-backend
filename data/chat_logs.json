@@ -1,0 +1,33 @@
+[
+    {
+        "timestamp": "2026-05-04T01:01:56.414150",
+        "query": {
+            "message": "How many Fast-API projects have abhinav worked on, name some",
+            "conversation_id": null
+        },
+        "reply": {
+            "response": "Abhinav has worked on at least 2 Fast-API projects, specifically CollabWrite and DocuMind.",
+            "confidence": 1.0,
+            "metadata": {},
+            "sources": [
+                "CollabWrite",
+                "DocuMind"
+            ]
+        }
+    },
+    {
+        "timestamp": "2026-05-04T01:02:40.564724",
+        "query": {
+            "message": "How many certificates does abhinav have",
+            "conversation_id": null
+        },
+        "reply": {
+            "response": "Abhinav has 1 certificate, which is an AWS cloud certification.",
+            "confidence": 1.0,
+            "metadata": {},
+            "sources": [
+                "Professional Background"
+            ]
+        }
+    }
+]
