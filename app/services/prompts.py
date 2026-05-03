@@ -27,11 +27,13 @@ Rules:
 
 def build_chat_prompt(query: str, context: str) -> str:
     return f"""
-    Use the below context to asnwer the question.
+    Use the below context and the associated metadata for each section to answer the question.
+    The [METADATA] tags contain valuable structured context like project name, stack, domains, etc.
     If you can't answer the question from the context, say exactly:
     "I don't have enough verified context to answer that confidently."
     take a summary of the context and answer the question accurately.
     - Synthesize across multiple relevant context sections when possible
+    - Pay close attention to the [METADATA] linked to each [SOURCE] to strengthen the context and accuracy of your answer
     - Do not anchor the response to only one retrieved section if multiple relevant sections support the answer
     - Prefer broader agreement across context over the single strongest isolated example
     - Use the strongest section as primary evidence, but incorporate supporting evidence from other relevant sections

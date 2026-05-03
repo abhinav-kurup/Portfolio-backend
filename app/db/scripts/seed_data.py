@@ -48,7 +48,8 @@ def seed_faq(conn):
 def seed_documents(conn):
     print("Seeding documents...")
 
-    file_path = "data/seed/documents.json"
+    # file_path = "data/seed/documents.json"
+    file_path = "data/seed/doc2.json"
     if not os.path.exists(file_path):
         print(f"  Warning: {file_path} not found. Skipping document seeding.")
         return
@@ -57,7 +58,9 @@ def seed_documents(conn):
         documents = json.load(f)
 
     for doc in documents:
-        new_hash = get_hash(doc["content"])
+        metadata = doc.get("metadata", {})
+        # Hash includes content + metadata to catch metadata-only changes
+        new_hash = get_hash(doc["content"] + json.dumps(metadata, sort_keys=True))
 
         existing = conn.execute("""
             SELECT id, content_hash FROM documents
@@ -68,7 +71,11 @@ def seed_documents(conn):
             print(f"  Skipped (unchanged): {doc['title']}")
             continue
 
-        vector = embeddings_client.embed(doc["content"])
+        # Concatenate title, metadata fields, and content for a richer semantic vector
+        metadata_summary = f"Project: {metadata.get('project', '')}. Stack: {', '.join(metadata.get('stack', []))}. Domain: {metadata.get('domain', '')}."
+        text_to_embed = f"Title: {doc['title']}\nContext: {metadata_summary}\nContent: {doc['content']}"
+        
+        vector = embeddings_client.embed(text_to_embed)
 
         if existing:
             # update existing document
@@ -88,6 +95,10 @@ def seed_documents(conn):
                 SET embedding = ?
                 WHERE doc_id = ?
             """, (serialize_vector(vector), existing["id"]))
+
+            # Update Knowledge Graph
+            from app.services.knowledge_graph.builder import index_document_graph
+            index_document_graph(doc_id=existing["id"], content=doc["content"], db=conn)
 
             print(f"  Updated: {doc['title']}")
 
@@ -110,6 +121,10 @@ def seed_documents(conn):
                 INSERT INTO doc_vec (doc_id, embedding)
                 VALUES (?, ?)
             """, (doc_id, serialize_vector(vector)))
+
+            # Index Knowledge Graph
+            from app.services.knowledge_graph.builder import index_document_graph
+            index_document_graph(doc_id=doc_id, content=doc["content"], db=conn)
 
             print(f"  Inserted: {doc['title']}")
 

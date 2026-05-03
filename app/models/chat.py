@@ -28,4 +28,5 @@ class RetrievedChunk(TypedDict):
     id: int
     title: str
     content: str
+    metadata: dict[str, Any]
     score: float

@@ -8,12 +8,16 @@ from app.clients.embeddings import embeddings_client
 from app.utils.similarity import serialize_vector
 from app.models.chat import RetrievedChunk
 from app.core.logging import setup_logging
+from app.services.knowledge_graph.retriever import (
+    extract_query_entities,
+    get_related_doc_ids,
+)
 
 logger = setup_logging()
 
-
 SEMANTIC_WEIGHT = 0.7
 LEXICAL_WEIGHT = 0.3
+GRAPH_BOOST = 0.15
 
 
 def _vector_search(
@@ -34,6 +38,7 @@ def _vector_search(
             d.id,
             d.title,
             d.content,
+            d.metadata,
             vec_distance_cosine(v.embedding, ?) AS distance
         FROM doc_vec v
         JOIN documents d ON d.id = v.doc_id
@@ -45,12 +50,15 @@ def _vector_search(
 
     results: dict[int, RetrievedChunk] = {}
 
+    import json
     for row in rows:
         similarity = 1.0 - float(row["distance"])
+        metadata_dict = json.loads(row["metadata"]) if row["metadata"] else {}
         results[row["id"]] = {
             "id": row["id"],
             "title": row["title"],
             "content": row["content"],
+            "metadata": metadata_dict,
             "score": round(similarity, 4),  # semantic score
         }
     
@@ -147,6 +155,10 @@ def retrieve_context(
 
     candidate_ids = set(semantic_results.keys()) | set(lexical_scores.keys())
 
+    # --- NEW: get graph-connected doc ids ---
+    seed_entity_ids = extract_query_entities(query, db)
+    graph_doc_ids   = get_related_doc_ids(seed_entity_ids, db)
+
     for doc_id in candidate_ids:
         semantic = semantic_results.get(doc_id, {}).get("score", 0.0)
         lexical = lexical_scores.get(doc_id, 0.0)
@@ -156,7 +168,7 @@ def retrieve_context(
         else:
             row = db.execute(
                 """
-                SELECT id, title, content
+                SELECT id, title, content, metadata
                 FROM documents
                 WHERE id = ?
                 """,
@@ -166,14 +178,24 @@ def retrieve_context(
             if row is None:
                 continue
 
+            import json
+            metadata_dict = json.loads(row["metadata"]) if row["metadata"] else {}
+
             doc = {
                 "id": row["id"],
                 "title": row["title"],
                 "content": row["content"],
+                "metadata": metadata_dict,
                 "score": 0.0,
             }
 
         hybrid_score = (SEMANTIC_WEIGHT * semantic) + (LEXICAL_WEIGHT * lexical)
+
+        # --- NEW: boost docs connected via the knowledge graph ---
+        if doc_id in graph_doc_ids:
+            hybrid_score = min(1.0, hybrid_score + GRAPH_BOOST)
+            logger.debug(f"  [KG Boost] doc_id={doc_id} boosted to {hybrid_score:.4f}")
+
         doc["score"] = round(hybrid_score, 4)
 
         merged[doc_id] = doc

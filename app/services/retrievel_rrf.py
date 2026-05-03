@@ -30,6 +30,7 @@ def _vector_search(
             d.id,
             d.title,
             d.content,
+            d.metadata,
             vec_distance_cosine(v.embedding, ?) AS distance
         FROM doc_vec v
         JOIN documents d ON d.id = v.doc_id
@@ -42,12 +43,14 @@ def _vector_search(
     results: list[RetrievedChunk] = []
 
     for row in rows:
+        import json
         similarity = 1.0 - float(row["distance"])
         results.append(
             {
                 "id": row["id"],
                 "title": row["title"],
                 "content": row["content"],
+                "metadata": json.loads(row["metadata"]),
                 "score": round(similarity, 4),
             }
         )
@@ -75,7 +78,8 @@ def _fts_search(
         SELECT
             d.id,
             d.title,
-            d.content
+            d.content,
+            d.metadata
         FROM doc_fts
         JOIN documents d ON d.id = doc_fts.rowid
         WHERE doc_fts MATCH ?
@@ -86,12 +90,14 @@ def _fts_search(
 
     results: list[RetrievedChunk] = []
 
+    import json
     for row in rows:
         results.append(
             {
                 "id": row["id"],
                 "title": row["title"],
                 "content": row["content"],
+                "metadata": json.loads(row["metadata"]),
                 "score": 0.0,  # placeholder, RRF ignores raw score
             }
         )
