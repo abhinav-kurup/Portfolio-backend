@@ -1,0 +1,23 @@
+name: Sync to HuggingFace Space
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Push to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "abhinavkurup@gmail.com"
+          git config --global user.name "Abhinav Kurup"
+          git remote add hfspace https://abhinavkurup:$HF_TOKEN@huggingface.co/spaces/abhinavkurup/portfolio-backend
+          git push hfspace main --force
