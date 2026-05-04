@@ -9,7 +9,7 @@ from app.core.logging import setup_logging
 # from app.db.connection import init_db
 from app.db.schema import create_schema
 from app.db.seed import run_seed
-from app.api import chat
+from app.api import chat, contact
 logger = setup_logging()
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.add_middleware(
 
 # routers
 app.include_router(chat.router,  prefix="/api",  tags=["chat"])
+app.include_router(contact.router, prefix="/api", tags=["contact"])
 # app.include_router(blogs.router, prefix="/api/v1/blogs", tags=["blogs"])
 # app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
