@@ -14,7 +14,7 @@ test_pipeline.py
 prd-backend.md
 pyproject.toml
 samp.txt
-portfolio.db
+data/portfolio.db
 uv.lock
 .python-version
 .env
