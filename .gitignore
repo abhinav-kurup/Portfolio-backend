@@ -19,3 +19,4 @@ uv.lock
 .python-version
 .env
 data/contact_submissions.json
+data/chat_logs.json
