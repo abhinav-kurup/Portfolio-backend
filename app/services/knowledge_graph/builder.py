@@ -44,14 +44,14 @@ def extract_graph(text: str) -> dict:
             model=settings.PRIMARY_LLM_MODEL,
             max_tokens=1000,
             temperature=0.0,
-            api_key=settings.PRIMARY_LLM_API_KEY
+            api_key=settings.GROK_API_KEY
         )
     else:
         llm = ChatGoogleGenerativeAI(
             model=settings.PRIMARY_LLM_MODEL,
             max_tokens=1000,
             temperature=0.0,
-            api_key=settings.PRIMARY_LLM_API_KEY
+            api_key=settings.GROK_API_KEY
         )
         
     structured_llm = llm.with_structured_output(GraphExtraction)

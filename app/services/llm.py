@@ -17,13 +17,16 @@ def condense_query(query: str, history: list[Any] = None) -> str:
     if not history:
         return query
     
-    # Simple check: if history exists, use a fast LLM pass to standalone the query
-    # This ensures 'it', 'they', 'the project' are resolved correctly.
     from app.services.prompts import CONDENSE_PROMPT
     
-    # Use raw_chat for internal processing (re-adding raw_chat to llm_client below)
-    # Actually I haven't added raw_chat yet. I'll just keep it simple for now.
-    return query 
+    standalone_query = llm_client.raw_chat(
+        system_prompt=CONDENSE_PROMPT,
+        user_prompt=f"Follow-up question: {query}",
+        history=history
+    )
+    
+    logger.info("Condensed query: %s", standalone_query)
+    return standalone_query 
 
 
 def generate_answer(query: str, context: str, history: list[Any] = None) -> ChatResponse:
