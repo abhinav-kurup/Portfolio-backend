@@ -1,5 +1,3 @@
-# app/main.py
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +42,10 @@ app.include_router(contact.router, prefix="/api", tags=["contact"])
 # app.include_router(blogs.router, prefix="/api/v1/blogs", tags=["blogs"])
 # app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
-@app.get("/health")
+@app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "healthy",
+        # "version": "1.0.0",
+        # "environment": settings.APP_ENV
+    }
