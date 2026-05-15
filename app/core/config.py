@@ -13,12 +13,17 @@ class Settings(BaseSettings):
     PRIMARY_LLM_PROVIDER: str = "groq"         
     PRIMARY_LLM_MODEL: str = "llama-3.3-70b-versatile"
     PRIMARY_LLM_MAX_TOKENS: int = 1000
-    PRIMARY_LLM_API_KEY: str = "None"
+    GROK_API_KEY: str = "None"
 
     FALLBACK_LLM_PROVIDER: str = "google"
-    FALLBACK_LLM_MODEL: str = "gemini-2.5-flash"
+    FALLBACK_LLM_MODEL: str = "gemini-3.1-flash-lite"
     FALLBACK_LLM_MAX_TOKENS: int = 1000
-    FALLBACK_LLM_API_KEY: str = "None"
+    GEMINI_API_KEY: str = "None"
+
+    # OPENROUTER_API_KEY: str = "None"
+    # CONTEXT_LLM_PROVIDER: str = "openrouter"
+    # CONTEXT_LLM_MODEL: str = "deepseek/deepseek-v3.1"
+    # CONTEXT_LLM_MAX_TOKENS: int = 1000
 
     # embeddings
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"  
