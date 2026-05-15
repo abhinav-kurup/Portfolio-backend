@@ -2,17 +2,29 @@
     {
         "doc_type": "project",
         "title": "CollabWrite",
-        "content": "CollabWrite is a real-time collaborative editing backend built to support low-latency multi-user document editing. It was built as a backend systems project focused on solving real-time synchronization, concurrent editing, and conflict resolution in shared documents. The stack used FastAPI, WebSockets, PostgreSQL, and Hugging Face models for AI-assisted text actions. This project was built as a production-style backend system, though not shipped as a public production product.\n\nThe backend uses FastAPI WebSockets and an in-memory connection manager to maintain long-lived document sessions, cursor state, and user presence. Instead of relying on stateless REST polling, active editing happens through persistent WebSocket connections that broadcast incremental document operations across connected users.\n\nTo support concurrent editing without locking the document, the backend uses a custom character-level CRDT. Each character is assigned a deterministic position using a site identifier, local counter, and timestamp, allowing concurrent inserts to resolve consistently across clients without central locking or Operational Transformation overhead.\n\nA major challenge was preventing write amplification during high-frequency edits. Writing every keystroke directly to PostgreSQL would create lock contention and excessive write pressure, so live document state is held in memory and flushed periodically through an async persistence loop.\n\nThe system also had to handle stale WebSocket sessions, ghost cursors, and memory leaks caused by dropped client connections. This was solved using heartbeat-based session tracking, ping/ack liveness checks, and periodic async cleanup to evict inactive users and stabilize in-memory session state.\n\nTo support AI-assisted editing features like paraphrasing, model inference was moved off the main async event loop into a thread-pool executor so that transformer inference would not block active WebSocket sessions or freeze real-time collaboration.",
+        "content": "CollabWrite is a real-time collaborative document editing backend built to handle multiple users editing the same document simultaneously with minimal latency.\n\nThe core challenge was concurrent editing without conflicts. The backend uses a custom character-level CRDT (Conflict-free Replicated Data Type) — each character gets a unique identity based on a site ID, counter, and timestamp. Two users can insert text at the same position at the exact same time, and both clients always end up with the same final document, no locking or rollback needed.\n\nReal-time communication runs over FastAPI WebSockets with persistent connections per document session. Clients receive incremental updates the moment another user makes a change, with cursor positions and user presence tracked across sessions.\n\nDatabase write pressure was a real problem — every keystroke hitting PostgreSQL directly would cause lock contention. Live document state is stored in Redis and flushed to PostgreSQL periodically through an async background loop. Moving document state to Redis makes the architecture a true distributed system. Multiple server instances can share and synchronize document state through a centralized store, enabling horizontal scaling without binding sessions or application state to a single server instance.\n\nThe system also supports AI-assisted editing like paraphrasing via Hugging Face models, with inference running in a thread-pool executor so it never blocks the WebSocket event loop.\n\nStack: FastAPI, WebSockets, PostgreSQL, Redis, Python, Hugging Face.",
         "metadata": {
             "project": "CollabWrite",
             "stack": [
                 "FastAPI",
                 "WebSockets",
                 "PostgreSQL",
+                "Redis",
                 "Python",
                 "Hugging Face"
             ],
             "domain": "real-time collaboration",
+            "keywords": [
+                "CRDT",
+                "real-time sync",
+                "WebSockets",
+                "concurrent editing",
+                "conflict resolution",
+                "async Python",
+                "Redis",
+                "distributed state management",
+                "horizontal scaling"
+            ],
             "production": false,
             "priority": "high"
         }
@@ -20,7 +32,7 @@
     {
         "doc_type": "project",
         "title": "DocuMind",
-        "content": "DocuMind is an agent-based document intelligence system built to answer questions over documents using retrieval, structured extraction, and citation-backed generation. It was built as an applied AI backend project focused on document QA, retrieval quality, and grounded LLM responses. The stack used FastAPI, LangGraph, LangChain, ChromaDB, Python, and local or hosted LLMs. This project was built as an applied AI backend system and production-style architecture, but not deployed as a customer-facing production product.\n\nThe system uses a stateful multi-step RAG pipeline built with LangGraph instead of a linear chain. Query execution is split into dedicated stages for routing, retrieval, extraction, and response generation so failures in one stage do not collapse the full pipeline.\n\nA major challenge was balancing structured extraction with natural response generation. This was solved by splitting the workflow into separate extraction and analysis stages, where one step first extracts structured fields and a later step converts them into grounded narrative output.\n\nThe retrieval pipeline uses ChromaDB with metadata-aware chunking and embedding search to support filtered semantic retrieval and reliable source-level traceability. Each chunk stores structured metadata such as source, page, and chunk index so the final response remains auditable.\n\nTo improve retrieval quality on broad queries, the system uses query planning, multi-pass retrieval, and context deduplication before ranking. Complex questions are split into smaller search queries, and duplicate chunks are removed before prompt assembly to reduce context pollution and improve retrieval density.\n\nBecause smaller local models were not always reliable for structured routing, the system includes fallback heuristics when structured output parsing fails. This keeps the retrieval flow stable even when LLM-based routing breaks.\n\nTo reduce hallucinations, the system enforces source-aware prompting, citation guardrails, and grounded response constraints so outputs remain tied to retrieved document context instead of unconstrained generation.",
+        "content": "DocuMind is a document question-answering system that lets users ask natural language questions over uploaded documents and get accurate, citation-backed answers. The focus was on building a retrieval pipeline that works reliably on real documents — not just clean demo inputs.\n\nInstead of a basic linear RAG chain, the system uses LangGraph to build a stateful multi-step pipeline with dedicated stages for query routing, retrieval, extraction, and response generation. Each stage is independent, so failures don't collapse the full pipeline.\n\nRetrieval quality was the biggest challenge. On broad queries, a single embedding search often returns scattered, unhelpful chunks. The fix was query planning — complex questions are broken into smaller sub-queries before hitting ChromaDB. Chunks are then deduplicated and ranked before prompt assembly, keeping the context window clean.\n\nChromaDB stores each chunk with metadata like source file, page number, and chunk index, so every answer can be traced back to a specific page in a specific document.\n\nAll responses are grounded through source-aware prompting and citation guardrails, keeping the model tied to retrieved content rather than generating unsupported answers.\n\nStack: FastAPI, LangGraph, LangChain, ChromaDB, Python, LLMs.",
         "metadata": {
             "project": "DocuMind",
             "stack": [
@@ -32,6 +44,18 @@
                 "LLMs"
             ],
             "domain": "AI / document intelligence",
+            "keywords": [
+                "RAG",
+                "retrieval-augmented generation",
+                "LangGraph",
+                "document QA",
+                "vector search",
+                "LLM",
+                "ChromaDB",
+                "grounded generation",
+                "citation",
+                "agentic pipeline"
+            ],
             "production": false,
             "priority": "high"
         }
@@ -39,7 +63,7 @@
     {
         "doc_type": "project",
         "title": "E-Beat",
-        "content": "E-Beat is a geospatial operational backend built for law-enforcement workflow management and field coordination. The project originated after winning a Goa Police hackathon, where the team proposed a practical approach to modernizing operational workflows used by field officers and higher-level management. Following the win, the team was brought in to help build the actual platform. The stack used Django, PostgreSQL, PostGIS, Firebase, and AWS. This project was shipped into production and used in live operational environments by field teams.\n\nThe platform was designed to centralize operational workflows such as officer tracking, geospatial task assignment, reporting, and field coordination across multiple administrative levels.\n\nThe backend uses PostGIS to model hierarchical spatial boundaries such as districts, stations, and beat areas, enforcing strict parent-child spatial constraints across operational zones.\n\nA major challenge was handling high-frequency live officer tracking without overwhelming the primary relational database. To solve this, the system used a hybrid architecture where PostgreSQL and PostGIS handled structured operational data while Firebase Realtime Database handled high-frequency telemetry for real-time location streaming.\n\nThe platform also included workflow-controlled data moderation using a staging-table approval pattern, where field-submitted spatial records were written to an intermediate state first and promoted into production tables only after administrative approval.\n\nBecause field officers often operated in low-bandwidth environments, image uploads were automatically compressed server-side using signal-driven image optimization to reduce payload size and improve sync reliability over slower mobile networks.\n\nThe system also enforced spatial workflow constraints, ensuring operational tasks could only be assigned within valid jurisdictional boundaries defined in the geospatial model.",
+        "content": "E-Beat is a production geospatial operations platform built for law enforcement field coordination. It started with winning a Goa Police hackathon — after the win, the team was brought on to actually build and ship the platform, which is now live and used in real operational environments.\n\nThe platform centralizes officer tracking, task assignment, field reporting, and administrative coordination into one backend system organized around spatial boundaries — districts, stations, and beat areas.\n\nThe geospatial layer uses PostGIS for hierarchical spatial modeling, with strict constraints ensuring tasks can only be assigned within valid jurisdictional boundaries — enforced at the data model level, not just in application logic.\n\nReal-time officer location tracking was a hard infrastructure problem. High-frequency GPS updates from field devices would have overwhelmed a relational database. The solution was a hybrid architecture: PostgreSQL and PostGIS handle structured operational data, while Firebase Realtime Database handles the live location stream — keeping the map responsive without polluting the operational database.\n\nThe platform also includes a staged approval workflow where field-submitted spatial records land in a staging table first and are promoted to production only after supervisor approval, preventing bad data from affecting live operations.\n\nStack: Django, PostgreSQL, PostGIS, Firebase, AWS. Shipped into production, actively used in live law enforcement operations.",
         "metadata": {
             "project": "E-Beat",
             "stack": [
@@ -50,6 +74,18 @@
                 "AWS"
             ],
             "domain": "geospatial operations",
+            "keywords": [
+                "PostGIS",
+                "geospatial",
+                "real-time tracking",
+                "Django",
+                "Firebase",
+                "spatial queries",
+                "production",
+                "law enforcement",
+                "hybrid architecture",
+                "GIS"
+            ],
             "production": true,
             "priority": "high"
         }
@@ -57,7 +93,7 @@
     {
         "doc_type": "project",
         "title": "Workforce and Event Management Platform",
-        "content": "This was a freelance backend project built as a cloud-based workforce and event management platform for an operations-driven business that needed a centralized system for workforce coordination, attendance, event execution, and reporting. The project came in as a freelance engagement to replace fragmented operational workflows with a more scalable cloud-hosted backend. The stack used Django, PostgreSQL, AWS, Celery, Redis, S3, and Django Channels. This project was shipped into production and used in live business operations.\n\nThe platform was designed to manage workforce allocation, event assignments, attendance workflows, reporting, and operational coordination through a centralized backend system.\n\nThe backend used Django with PostgreSQL as the core application layer, with normalized relational modeling to manage employees, attendance hardware, event entities, and operational dependencies.\n\nTo support long-running tasks such as report generation, bulk exports, and document processing, the system used Celery with Redis to offload heavy I/O workloads from the request cycle and process them asynchronously.\n\nFor deployments, the platform used a Blue-Green deployment pipeline on AWS using GitHub Actions, ECR, CodeDeploy, ECS on EC2, and an Application Load Balancer. This enabled zero-downtime releases for the primary backend and fast rollback through target-group traffic cutover.\n\nThe system also included real-time communication using Django Channels and a Redis-backed channel layer to manage WebSocket connections from attendance hardware devices and live operational dashboards.\n\nA major challenge was memory exhaustion during large exports involving reports and binary assets. This was solved by switching to streamed in-memory processing using BytesIO and sequential archive generation, which stabilized worker memory usage during large export jobs.\n\nThe platform also enforced role-aware access control and real-time authorization boundaries across operational workflows and administrative interfaces.",
+        "content": "A production workforce and event management platform built as a freelance engagement to replace fragmented manual workflows with a centralized backend system. It handles employee coordination, event assignments, attendance tracking, and reporting — actively used in live business operations.\n\nLong-running tasks like report generation and bulk exports are offloaded to Celery workers backed by Redis, running completely outside the request cycle so users aren't blocked waiting for heavy jobs.\n\nA key engineering problem was memory exhaustion during large exports — reports with thousands of records were crashing workers. The fix was streamed in-memory processing using BytesIO and sequential archive generation, building exports incrementally instead of loading everything at once. This made large exports stable and reliable.\n\nThe platform uses Django Channels with a Redis channel layer for real-time WebSocket connections from attendance hardware and live dashboards.\n\nDeployments run on AWS with a Blue-Green pipeline using GitHub Actions, ECR, CodeDeploy, and ECS on EC2 behind an Application Load Balancer — zero-downtime releases with fast rollback via traffic cutover.\n\nStack: Django, PostgreSQL, AWS, Celery, Redis, Django Channels. Shipped into production, used in live business operations.",
         "metadata": {
             "project": "Workforce and Event Management Platform",
             "stack": [
@@ -69,14 +105,55 @@
                 "Django Channels"
             ],
             "domain": "workforce and event operations",
+            "keywords": [
+                "Django",
+                "Celery",
+                "Redis",
+                "WebSockets",
+                "AWS ECS",
+                "blue-green deployment",
+                "async task queue",
+                "production",
+                "real-time",
+                "CI/CD"
+            ],
             "production": true,
+            "priority": "high"
+        }
+    },
+    {
+        "doc_type": "project",
+        "title": "QRGuard: AI-Powered QR Security Scanner",
+        "content": "QRGuard is a real-time threat detection system designed to protect users from malicious links embedded in QR codes. It bridges the gap between raw threat intelligence and user-friendly security advice by combining traditional URL reputation checks with LLM-based semantic analysis.\n\nThe core technical challenge was translating fragmented security metrics from multiple threat engines into actionable verdicts. The system decodes QR data using `pyzbar` and cross-references extracted URLs with the VirusTotal API. To provide more than just a binary 'safe/unsafe' output, I integrated Google Gemini to perform real-time reasoning over VirusTotal’s analysis stats, generating human-readable verdicts (SAFE, WARNING, or DANGER) that explain *why* a link might be suspicious.\n\nFor persistence, I chose Apache Cassandra as the audit logging backend. While a simple SQL database could suffice for small scales, Cassandra provides a distributed, high-availability architecture capable of handling write-heavy scan logs with minimal latency, ensuring the system remains responsive even as the audit trail grows.\n\nThe entire ecosystem is containerized via Docker and Docker Compose, managing the complex system-level dependencies required for image processing (libzbar) while orchestrating the communication between the Streamlit frontend and the distributed NoSQL cluster.\n\nStack: Streamlit, Apache Cassandra, Google Gemini, VirusTotal API, Python, Docker.",
+        "metadata": {
+            "project": "QR Security Scanner",
+            "stack": [
+                "Streamlit",
+                "Apache Cassandra",
+                "Google Gemini",
+                "VirusTotal API",
+                "Python",
+                "Docker"
+            ],
+            "domain": "Cybersecurity",
+            "keywords": [
+                "QR Scanning",
+                "Threat Intelligence",
+                "LLM Reasoning",
+                "NoSQL Persistence",
+                "Cassandra",
+                "VirusTotal Integration",
+                "Image Processing",
+                "Dockerized Microservices"
+            ],
+            "production": false,
             "priority": "high"
         }
     },
     {
         "doc_type": "profile",
         "title": "Professional Background",
-        "content": "Abhinav Kurup is a backend-focused software engineer with around 2 years of experience building Python-based systems across backend engineering, cloud infrastructure, and applied AI workflows. His work has focused on APIs, real-time systems, retrieval pipelines, automation platforms, and production backend services. He has built systems across collaborative editing, geospatial operations, document intelligence, workforce platforms, and enterprise automation, with 2 backend systems shipped into production and used in live operational environments. His strongest areas are Python backend development, system design, database-heavy workflows, and building scalable backend systems with practical cloud infrastructure. He has worked primarily with Python, Django, FastAPI, PostgreSQL, Redis, AWS, Docker, WebSockets, and LLM-based systems, and also holds an AWS cloud certification. He is primarily targeting backend and AI engineering roles focused on intelligent systems, LLM-powered applications, and production-grade backend architecture.",
+        "content": "Abhinav Kurup is a software engineer with 2 years of experience in backend engineering and applied AI. He has shipped 2 backend systems into production that are actively used in live operational environments.\n\nOn the backend side, he has built APIs using Django and FastAPI, worked with PostgreSQL (including geospatial systems with PostGIS), and used async patterns, WebSockets, task queues (Celery + Redis), and AWS infrastructure. He holds an AWS cloud certification.\n\nOn the AI side, he has built RAG pipelines, agentic workflows with LangGraph, and document intelligence systems — working with ChromaDB, Hugging Face models, and LLM-based systems focused on retrieval quality and grounded generation.\n\nHe is currently targeting backend and AI engineering roles in teams building intelligent systems, LLM-powered products, and production-grade backend infrastructure.",
         "metadata": {
             "stack": [
                 "Python",
@@ -87,9 +164,31 @@
                 "AWS",
                 "Docker",
                 "WebSockets",
-                "LLMs"
+                "LLMs",
+                "LangGraph",
+                "ChromaDB",
+                "Celery",
+                "PostGIS"
             ],
             "domain": "professional background",
+            "keywords": [
+                "backend engineer",
+                "AI engineer",
+                "Python",
+                "Django",
+                "FastAPI",
+                "RAG",
+                "LLM",
+                "LangGraph",
+                "PostgreSQL",
+                "AWS",
+                "real-time systems",
+                "production systems",
+                "REST API",
+                "WebSockets",
+                "Celery",
+                "Redis"
+            ],
             "production_systems": 2,
             "certifications": [
                 "AWS"
@@ -100,7 +199,7 @@
     {
         "doc_type": "education",
         "title": "Educational Background",
-        "content": "Abhinav Kurup completed his Bachelor of Engineering (B.E.) in Computer Engineering from Goa College of Engineering between 2020 and 2024, graduating with a CGPA of 8.55. During his undergraduate studies, he developed strong foundations in computer science, backend engineering, databases, and software development, which later aligned with his focus on scalable backend systems and applied AI workflows. Prior to his engineering degree, he completed his higher secondary education at Kendriya Vidyalaya No. 1 under the CBSE curriculum, securing 94.2% in Class XII between 2018 and 2020.",
+        "content": "Abhinav Kurup completed his Bachelor of Engineering in Computer Engineering from Goa College of Engineering (2020–2024) with a CGPA of 8.55. Before that, he completed Class XII under CBSE at Kendriya Vidyalaya No. 1, scoring 94.2%.",
         "metadata": {
             "degree": "B.E. in Computer Engineering",
             "college": "Goa College of Engineering",
