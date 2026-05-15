@@ -97,8 +97,8 @@ def seed_documents(conn):
             """, (serialize_vector(vector), existing["id"]))
 
             # Update Knowledge Graph
-            from app.services.knowledge_graph.builder import index_document_graph
-            index_document_graph(doc_id=existing["id"], content=doc["content"], db=conn)
+            # from app.services.knowledge_graph.builder import index_document_graph
+            # index_document_graph(doc_id=existing["id"], content=doc["content"], db=conn)
 
             print(f"  Updated: {doc['title']}")
 
@@ -123,8 +123,8 @@ def seed_documents(conn):
             """, (doc_id, serialize_vector(vector)))
 
             # Index Knowledge Graph
-            from app.services.knowledge_graph.builder import index_document_graph
-            index_document_graph(doc_id=doc_id, content=doc["content"], db=conn)
+            # from app.services.knowledge_graph.builder import index_document_graph
+            # index_document_graph(doc_id=doc_id, content=doc["content"], db=conn)
 
             print(f"  Inserted: {doc['title']}")
 

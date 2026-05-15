@@ -5,9 +5,14 @@ from app.models.common import BaseSchema
 
 
 
+class Message(BaseModel):
+    role: str = Field(..., description="Role of the sender (user/assistant)")
+    content: str = Field(..., description="Message content")
+
 class ChatRequest(BaseSchema):
-    message : str = Field(...,description="User's message")
-    conversation_id: str | None = Field(default=None,description="Conversation ID")
+    message: str = Field(..., description="Current user message")
+    conversation_id: str | None = Field(default=None)
+    history: list[Message] = Field(default_factory=list, description="Recent conversation history")
 
 
 class ChatResponse(BaseSchema):

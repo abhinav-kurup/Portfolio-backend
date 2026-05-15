@@ -9,6 +9,7 @@ from app.db.connection import get_db
 from app.core.logging import setup_logging
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.pipeline import run_chat_pipeline
+from app.api.deps import get_admin_key
 
 logger = setup_logging()
 
@@ -31,6 +32,7 @@ def chat(
 ) -> ChatResponse:
 
     logger.info("Chat request received", extra={"payload": payload})
+    print("PAYLOAD",payload)
     response = run_chat_pipeline(payload, db)
     log_interaction(payload, response)
     return response
@@ -38,9 +40,9 @@ def chat(
 @router.get(
     "/logs",
     summary="Retrieve chat logs",
-    description="Returns the chat logs stored in the JSON file.",
+    description="Returns the chat logs stored in the JSON file. Requires admin API key.",
 )
-def get_chat_logs():
+def get_chat_logs(admin_key: str = Depends(get_admin_key)):
     file_path = "data/chat_logs.json"
     if not os.path.exists(file_path):
         return {"logs": []}
@@ -54,4 +56,4 @@ def get_chat_logs():
             return {"logs": []}
     except Exception as e:
         logger.error(f"Error reading chat logs: {e}")
-        raise HTTPException(status_code=500, detail="Could not read chat logs")
+        raise HTTPException(status_code=500, detail="Could not read chat logs")

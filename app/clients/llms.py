@@ -35,11 +35,14 @@ class LLMClient:
         )
         return model.with_structured_output(ChatResponse)
 
-    def chat(self, system_promt:str, user_prompt:str) -> ChatResponse:
-        messages = [
-                ("system", system_promt),
-                ("user",user_prompt)
-            ]
+    def chat(self, system_promt:str, user_prompt:str, history: list[Any] = None) -> ChatResponse:
+        messages = [("system", system_promt)]
+        
+        if history:
+            for msg in history:
+                messages.append((msg.role, msg.content))
+        
+        messages.append(("user", user_prompt))
         try:
             logger.info("Using primary LLM")
             response = self.primary_client.invoke(messages)

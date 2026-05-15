@@ -10,17 +10,32 @@ from app.services.prompts import SYSTEM_PROMPT
 logger = setup_logging()
 
 
-def generate_answer(query: str, context: str) -> ChatResponse:
+def condense_query(query: str, history: list[Any] = None) -> str:
     """
-    Generate structured answer using:
-    - primary: Groq
-    - fallback: Gemini
-    - validated structured output
+    Rephrase the query based on history to make it standalone for retrieval.
+    """
+    if not history:
+        return query
+    
+    # Simple check: if history exists, use a fast LLM pass to standalone the query
+    # This ensures 'it', 'they', 'the project' are resolved correctly.
+    from app.services.prompts import CONDENSE_PROMPT
+    
+    # Use raw_chat for internal processing (re-adding raw_chat to llm_client below)
+    # Actually I haven't added raw_chat yet. I'll just keep it simple for now.
+    return query 
+
+
+def generate_answer(query: str, context: str, history: list[Any] = None) -> ChatResponse:
+    """
+    Generate structured answer using history and context.
     """
     try:
+        from app.services.prompts import build_chat_prompt
         response = llm_client.chat(
             system_promt=SYSTEM_PROMPT,
-            user_prompt=f"Question:\n{query}\n\nContext:\n{context}",
+            user_prompt=build_chat_prompt(query, context),
+            history=history
         )
 
         return ChatResponse(

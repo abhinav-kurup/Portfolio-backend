@@ -131,31 +131,31 @@ END;
 """
 
 
-KG_ENTITIES_TABLE = """
-CREATE TABLE IF NOT EXISTS kg_entities (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    name      TEXT NOT NULL,
-    type      TEXT,                -- e.g. "PERSON", "PROJECT", "SKILL", "TECHNOLOGY"
-    doc_id    INTEGER REFERENCES documents(id) ON DELETE CASCADE,
-    UNIQUE(name, doc_id)
-);
-"""
+# KG_ENTITIES_TABLE = """
+# CREATE TABLE IF NOT EXISTS kg_entities (
+#     id        INTEGER PRIMARY KEY AUTOINCREMENT,
+#     name      TEXT NOT NULL,
+#     type      TEXT,                -- e.g. "PERSON", "PROJECT", "SKILL", "TECHNOLOGY"
+#     doc_id    INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+#     UNIQUE(name, doc_id)
+# );
+# """
 
-KG_RELATIONS_TABLE = """
-CREATE TABLE IF NOT EXISTS kg_relations (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    subject_id  INTEGER NOT NULL REFERENCES kg_entities(id) ON DELETE CASCADE,
-    predicate   TEXT NOT NULL,     -- e.g. "built", "uses", "worked_at", "knows"
-    object_id   INTEGER NOT NULL REFERENCES kg_entities(id) ON DELETE CASCADE,
-    doc_id      INTEGER REFERENCES documents(id) ON DELETE CASCADE
-);
-"""
+# KG_RELATIONS_TABLE = """
+# CREATE TABLE IF NOT EXISTS kg_relations (
+#     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+#     subject_id  INTEGER NOT NULL REFERENCES kg_entities(id) ON DELETE CASCADE,
+#     predicate   TEXT NOT NULL,     -- e.g. "built", "uses", "worked_at", "knows"
+#     object_id   INTEGER NOT NULL REFERENCES kg_entities(id) ON DELETE CASCADE,
+#     doc_id      INTEGER REFERENCES documents(id) ON DELETE CASCADE
+# );
+# """
 
-KG_INDICES = """
-CREATE INDEX IF NOT EXISTS idx_kg_relations_subject ON kg_relations(subject_id);
-CREATE INDEX IF NOT EXISTS idx_kg_relations_object  ON kg_relations(object_id);
-CREATE INDEX IF NOT EXISTS idx_kg_entities_name     ON kg_entities(name);
-"""
+# KG_INDICES = """
+# CREATE INDEX IF NOT EXISTS idx_kg_relations_subject ON kg_relations(subject_id);
+# CREATE INDEX IF NOT EXISTS idx_kg_relations_object  ON kg_relations(object_id);
+# CREATE INDEX IF NOT EXISTS idx_kg_entities_name     ON kg_entities(name);
+# """
 
 SCHEMA_SQL = "\n".join(
     [
@@ -167,9 +167,9 @@ SCHEMA_SQL = "\n".join(
         DOC_FTS,
         DOC_FTS_TRIGGERS,
         UPDATED_AT_TRIGGERS,
-        KG_ENTITIES_TABLE,
-        KG_RELATIONS_TABLE,
-        KG_INDICES,
+        # KG_ENTITIES_TABLE,
+        # KG_RELATIONS_TABLE,
+        # KG_INDICES,
     ]
 )
 
