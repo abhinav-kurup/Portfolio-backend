@@ -96,5 +96,25 @@
             ],
             "priority": "high"
         }
+    },
+    {
+        "doc_type": "education",
+        "title": "Educational Background",
+        "content": "Abhinav Kurup completed his Bachelor of Engineering (B.E.) in Computer Engineering from Goa College of Engineering between 2020 and 2024, graduating with a CGPA of 8.55. During his undergraduate studies, he developed strong foundations in computer science, backend engineering, databases, and software development, which later aligned with his focus on scalable backend systems and applied AI workflows. Prior to his engineering degree, he completed his higher secondary education at Kendriya Vidyalaya No. 1 under the CBSE curriculum, securing 94.2% in Class XII between 2018 and 2020.",
+        "metadata": {
+            "degree": "B.E. in Computer Engineering",
+            "college": "Goa College of Engineering",
+            "cgpa": 8.55,
+            "graduation_year": 2024,
+            "school": "Kendriya Vidyalaya No. 1",
+            "board": "CBSE",
+            "class_xii_percentage": 94.2,
+            "education_periods": {
+                "engineering": "2020-2024",
+                "higher_secondary": "2018-2020"
+            },
+            "domain": "education",
+            "priority": "high"
+        }
     }
 ]
