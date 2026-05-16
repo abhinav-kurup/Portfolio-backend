@@ -1,7 +1,6 @@
 import random
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from typing import Any
 from app.core.config import settings
