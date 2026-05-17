@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # llm
     PRIMARY_LLM_PROVIDER: str = "groq"         
-    PRIMARY_LLM_MODEL: str = "llama-3.3-70b-versatile"
+    PRIMARY_LLM_MODEL: str = "openai/gpt-oss-120b"
     PRIMARY_LLM_MAX_TOKENS: int = 1000
     GROK_API_KEY: str = "None"
 
