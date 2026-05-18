@@ -151,6 +151,38 @@
         }
     },
     {
+        "doc_type": "project",
+        "title": "Portfolio Backend & AI Chatbot",
+        "content": "A FastAPI portfolio backend and agentic chatbot serving as an interactive resume, delivering citation-backed, non-hallucinatory answers about my engineering background.To guarantee low latency and resilience, I implemented a dual-LLM routing pipeline. It dynamically routes queries to Groq (using high-speed Qwen models) for sub-second execution, falling back to Google Gemini if rate limits are hit or failures occur.A key engineering challenge was context drift in multi-turn conversations. To resolve this, I built a stateful, multi-stage pipeline: incoming queries pass through scope-checking guardrails, chat history is condensed into a search query, and an FAQ database is checked first to avoid unnecessary LLM calls.For retrieval, the system uses a hybrid approach. It integrates a semantic vector search (leveraging Hugging Face's 384-dimensional all-MiniLM-L6-v2 embeddings via sqlite-vec) with SQLite FTS5 lexical keyword search. I coupled this with a custom SQLite-backed Knowledge Graph that extracts query entities and boosts related documents by 15%, injecting structured relational facts directly into the prompt.\n\nStack: FastAPI, SQLite, sqlite-vec, Groq, Google Gemini, Hugging Face, Python.",
+        "metadata": {
+            "project": "Portfolio Backend & AI Chatbot",
+            "stack": [
+                "FastAPI",
+                "SQLite",
+                "sqlite-vec",
+                "Groq",
+                "Google Gemini",
+                "Hugging Face",
+                "Python"
+            ],
+            "domain": "AI / backend infrastructure",
+            "keywords": [
+                "FastAPI",
+                "hybrid retrieval",
+                "Knowledge Graph",
+                "sqlite-vec",
+                "FTS5",
+                "RAG",
+                "model routing",
+                "dual-LLM",
+                "guardrails",
+                "conversational agent"
+            ],
+            "production": false,
+            "priority": "high"
+        }
+    },
+    {
         "doc_type": "profile",
         "title": "Professional Background",
         "content": "Abhinav Kurup is a software engineer with 2 years of experience in backend engineering and applied AI. He has shipped 2 backend systems into production that are actively used in live operational environments.\n\nOn the backend side, he has built APIs using Django and FastAPI, worked with PostgreSQL (including geospatial systems with PostGIS), and used async patterns, WebSockets, task queues (Celery + Redis), and AWS infrastructure. He holds an AWS cloud certification.\n\nOn the AI side, he has built RAG pipelines, agentic workflows with LangGraph, and document intelligence systems — working with ChromaDB, Hugging Face models, and LLM-based systems focused on retrieval quality and grounded generation.\n\nHe is currently targeting backend and AI engineering roles in teams building intelligent systems, LLM-powered products, and production-grade backend infrastructure.",
