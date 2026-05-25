@@ -1,297 +1,294 @@
 [
-    {
-        "doc_type": "project",
-        "title": "CollabWrite",
-        "content": "CollabWrite is a real-time collaborative document editing backend built to handle multiple users editing the same document simultaneously with minimal latency.\n\nThe core challenge was concurrent editing without conflicts. The backend uses a custom character-level CRDT (Conflict-free Replicated Data Type) — each character gets a unique identity based on a site ID, counter, and timestamp. Two users can insert text at the same position at the exact same time, and both clients always end up with the same final document, no locking or rollback needed.\n\nReal-time communication runs over FastAPI WebSockets with persistent connections per document session. Clients receive incremental updates the moment another user makes a change, with cursor positions and user presence tracked across sessions.\n\nDatabase write pressure was a real problem — every keystroke hitting PostgreSQL directly would cause lock contention. Live document state is stored in Redis and flushed to PostgreSQL periodically through an async background loop. Moving document state to Redis makes the architecture a true distributed system. Multiple server instances can share and synchronize document state through a centralized store, enabling horizontal scaling without binding sessions or application state to a single server instance.\n\nThe system also supports AI-assisted editing like paraphrasing via Hugging Face models, with inference running in a thread-pool executor so it never blocks the WebSocket event loop.\n\nStack: FastAPI, WebSockets, PostgreSQL, Redis, Python, Hugging Face.",
-        "metadata": {
-            "project": "CollabWrite",
-            "stack": [
-                "FastAPI",
-                "WebSockets",
-                "PostgreSQL",
-                "Redis",
-                "Python",
-                "Hugging Face"
-            ],
-            "domain": "real-time collaboration",
-            "keywords": [
-                "CRDT",
-                "real-time sync",
-                "WebSockets",
-                "concurrent editing",
-                "conflict resolution",
-                "async Python",
-                "Redis",
-                "distributed state management",
-                "horizontal scaling"
-            ],
-            "production": false,
-            "priority": "high"
-        }
-    },
-    {
-      "doc_type": "project",
-      "title": "DocuMind",
-      "content": "DocuMind is a production-oriented document Q&A platform built on a local-first LLM stack. It enables natural-language querying over uploaded PDFs with full auditability, grounded citations, and modular multi-agent orchestration via LangGraph.## Core Architecture### Multi-Agent Pipeline (LangGraph StateGraph)The system decomposes document Q&A into discrete, failure-isolated stages: query routing → hybrid retrieval → optional structured extraction → response synthesis → optional tool calls. Single-stage failures (e.g. extraction or tool invocation) do not cascade — each agent contributes to a shared state object and logs an audit entry independently.### Hybrid Retrieval EngineRetrieval goes beyond naive single-query embedding lookup. Complex user queries are decomposed into optimised sub-queries via a query planning step, then run through a two-pronged retrieval strategy:- Dense retrieval — semantic vector search over ChromaDB embeddings (all-MiniLM-L6-v2)- Sparse retrieval — BM25 keyword fallback for exact-match and low-frequency term coverageResults are merged, deduplicated on chunk overlap, and optionally reranked with a Cross-Encoder for precision. This hybrid approach meaningfully improves recall on multi-faceted, ambiguous, or domain-specific queries compared to vector-only RAG.### Speech I/O Adapters Voice queries are transcribed using OpenAI Whisper, a robust STT model that handles accented speech and noisy audio well. Responses are played back via a HuggingFace SpeechT5 pipeline — using SpeechT5ForTextToSpeech for synthesis, SpeechT5HifiGan as the vocoder, and SpeechT5Processor for input preprocessing — keeping the entire speech stack local and dependency-contained. ### Grounded Generation with CitationsRetrieved chunks carry rich metadata (source filename, page number, chunk index). LLM prompts are constructed with citation guardrails enforcing that every factual claim maps back to a specific document and page. Answers are traceable by design, not by convention.## Retrieval - Dense + BM25 hybrid, query decomposition, chunk dedup, Cross-Encoder reranking , Orchestration- LangGraph StateGraph with per-agent audit accumulation , Inference - Ollama (local, on-prem) with Groq as optional hosted fallback , Ingestion , PyMuPDF parsing + recursive chunker preserving semantic boundaries , Storage , ChromaDB with page-level metadata for precise citation , Logging , JSONL audit trail per query — every agent step is inspectable , I/O STT/TTS adapters for voice queries and reply playback , Output control , Structured LLM output adapters for controlled, parseable responses ,## Why It's Built This Way- Hybrid retrieval over pure vector search — BM25 catches what embeddings miss on rare terms and exact phrases; the combination improves end-to-end answer quality on real-world heterogeneous documents.- Query planning — decomposing compound questions into sub-queries prevents single-embedding bottlenecks and improves coverage across large document corpora.- Local-first inference — Ollama integration keeps sensitive documents off third-party servers; Groq fallback is opt-in for speed/cost tradeoffs.- Audit trails — JSONL logging makes the system debuggable in production and defensible in regulated or enterprise contexts.- Modular failure isolation — LangGraph's graph structure means retrieval failures, tool errors, and extraction failures are handled per-stage rather than failing the whole pipeline.",
-      "metadata": {
-        "project": "DocuMind",
-        "stack": [
-          "LangGraph",
-          "LangChain",
-          "Ollama (local LLMs)",
-          "Groq (optional hosted)",
-          "ChromaDB",
-          "sentence-transformers (all-MiniLM-L6-v2)",
-          "CrossEncoder (optional reranker)",
-          "BM25 (keyword fallback)",
-          "Speech (STT/TTS adapters)"
-        ],
-        "domain": "AI / document intelligence",
-        "keywords": [
-          "RAG",
-          "hybrid retrieval",
-          "BM25",
-          "Cross-Encoder reranking",
-          "LangGraph",
-          "multi-agent pipeline",
-          "vector search",
-          "ChromaDB",
-          "Ollama",
-          "citation guardrails",
-          "speech-to-text",
-          "text-to-speech",
-          "JSONL audit trail",
-          "tool calls",
-        ],
-        "production": false,
-        "priority": "high"
-      }
-    },
-    {
-      "doc_type": "project",
-      "title": "MCP Financial Analyst",
-      "content": "MCP Financial Analyst is an agentic, tool-driven financial analysis system that answers natural-language investment and technical-analysis questions with verifiable data and fully transparent tool traces. The system orchestrates lightweight MCP servers covering prices, technical indicators, news sentiment, fundamentals, and chart generation, then synthesizes a structured markdown report that always points back to the concrete tool calls and data behind each claim. Agentic Pipeline (LangGraph — Reason → Act → Synthesize)A stateful three-stage LangGraph pipeline separates reasoning (plan which tools to call), acting (execute against live MCP endpoints), and synthesis (build the report only after verified tool results are in hand). Partial failures are isolated per stage — a failed indicator call does not block price or sentiment results. Dynamic Tool Creation Every MCP server publishes a JSON schema; the orchestrator builds Pydantic-backed LangChain StructuredTools at runtime. Adding a new MCP server requires zero changes to the orchestrator — it is immediately discoverable and callable. MCP Client & Model Routing An SSE-backed MCPClientManager on AsyncExitStack handles tool listing, invocation, argument normalization, and output compaction across servers. A litellm ChatLiteLLMRouter blends Groq and Gemini with weighted shuffle routing for reliability and cost control — no single-provider lock-in. Orchestration  LangGraph reason → act → synthesize with per-stage failure isolation Tool layer  Runtime StructuredTool creation from MCP JSON schemas via Pydantic MCP client  SSE AsyncExitStack with argument normalization and output compaction  Model routing  litellm Router across Groq and Gemini with weighted shuffle  Financial data  yfinance (prices), pandas_ta (indicators), sentiment, fundamentals  Auditability  tool_calls_made, tool_results, reasoning_steps, charts on every response  UI  Streamlit with inline chart rendering and expandable tool call panels - Staged pipeline over single-shot prompting — separating reasoning, acting, and synthesis prevents the model from hallucinating data it has not yet retrieved. Dynamic tool binding — MCP schema-driven approach scales to new data sources without touching orchestrator logic. Model routing litellm abstracts provider differences and handles failover across Groq and Gemini. Auditable outputs by default — tool calls, results, and reasoning steps are first-class response fields, making answer provenance fully traceable.",
-    
-      "metadata": {
-        "project": "MCP Financial Analyst",
-        "stack": [
-          "Python",
-          "FastAPI",
-          "LangGraph",
-          "LangChain",
-          "MCP (FastMCP / SSE)",
-          "litellm (Router)",
-          "ChatLiteLLMRouter",
-          "Groq",
-          "Gemini",
-          "pandas_ta",
-        ],
-        "domain": "AI / finance / agentic tool orchestration",
-        "keywords": [
-          "agentic orchestration",
-          "MCP",
-          "FastMCP",
-          "SSE",
-          "LangGraph",
-          "LangChain",
-          "litellm",
-          "model routing",
-          "Groq",
-          "Gemini",
-          "chart generation",
-          "base64 PNG",
-          "tool-call audit",
-        ],
-        "production": false,
-        "priority": "high"
-      }
-    },
-    {
-        "doc_type": "project",
-        "title": "E-Beat",
-        "content": "E-Beat is a production geospatial operations platform built for law enforcement field coordination. It started with winning a Goa Police hackathon — after the win, the team was brought on to actually build and ship the platform, which is now live and used in real operational environments.\n\nThe platform centralizes officer tracking, task assignment, field reporting, and administrative coordination into one backend system organized around spatial boundaries — districts, stations, and beat areas.\n\nThe geospatial layer uses PostGIS for hierarchical spatial modeling, with strict constraints ensuring tasks can only be assigned within valid jurisdictional boundaries — enforced at the data model level, not just in application logic.\n\nReal-time officer location tracking was a hard infrastructure problem. High-frequency GPS updates from field devices would have overwhelmed a relational database. The solution was a hybrid architecture: PostgreSQL and PostGIS handle structured operational data, while Firebase Realtime Database handles the live location stream — keeping the map responsive without polluting the operational database.\n\nThe platform also includes a staged approval workflow where field-submitted spatial records land in a staging table first and are promoted to production only after supervisor approval, preventing bad data from affecting live operations.\n\nStack: Django, PostgreSQL, PostGIS, Firebase, AWS. Shipped into production, actively used in live law enforcement operations.",
-        "metadata": {
-            "project": "E-Beat",
-            "stack": [
-                "Django",
-                "PostgreSQL",
-                "PostGIS",
-                "Firebase",
-                "AWS"
-            ],
-            "domain": "geospatial operations",
-            "keywords": [
-                "PostGIS",
-                "geospatial",
-                "real-time tracking",
-                "Django",
-                "Firebase",
-                "spatial queries",
-                "production",
-                "law enforcement",
-                "hybrid architecture",
-                "GIS"
-            ],
-            "production": true,
-            "priority": "high"
-        }
-    },
-    {
-        "doc_type": "project",
-        "title": "Workforce and Event Management Platform",
-        "content": "A production workforce and event management platform built as a freelance engagement to replace fragmented manual workflows with a centralized backend system. It handles employee coordination, event assignments, attendance tracking, and reporting — actively used in live business operations.\n\nLong-running tasks like report generation and bulk exports are offloaded to Celery workers backed by Redis, running completely outside the request cycle so users aren't blocked waiting for heavy jobs.\n\nA key engineering problem was memory exhaustion during large exports — reports with thousands of records were crashing workers. The fix was streamed in-memory processing using BytesIO and sequential archive generation, building exports incrementally instead of loading everything at once. This made large exports stable and reliable.\n\nThe platform uses Django Channels with a Redis channel layer for real-time WebSocket connections from attendance hardware and live dashboards.\n\nDeployments run on AWS with a Blue-Green pipeline using GitHub Actions, ECR, CodeDeploy, and ECS on EC2 behind an Application Load Balancer — zero-downtime releases with fast rollback via traffic cutover.\n\nStack: Django, PostgreSQL, AWS, Celery, Redis, Django Channels. Shipped into production, used in live business operations.",
-        "metadata": {
-            "project": "Workforce and Event Management Platform",
-            "stack": [
-                "Django",
-                "PostgreSQL",
-                "AWS",
-                "Celery",
-                "Redis",
-                "Django Channels"
-            ],
-            "domain": "workforce and event operations",
-            "keywords": [
-                "Django",
-                "Celery",
-                "Redis",
-                "WebSockets",
-                "AWS ECS",
-                "blue-green deployment",
-                "async task queue",
-                "production",
-                "real-time",
-                "CI/CD"
-            ],
-            "production": true,
-            "priority": "high"
-        }
-    },
-    {
-        "doc_type": "project",
-        "title": "QRGuard: AI-Powered QR Security Scanner",
-        "content": "QRGuard is a real-time threat detection system designed to protect users from malicious links embedded in QR codes. It bridges the gap between raw threat intelligence and user-friendly security advice by combining traditional URL reputation checks with LLM-based semantic analysis.\n\nThe core technical challenge was translating fragmented security metrics from multiple threat engines into actionable verdicts. The system decodes QR data using `pyzbar` and cross-references extracted URLs with the VirusTotal API. To provide more than just a binary 'safe/unsafe' output, I integrated Google Gemini to perform real-time reasoning over VirusTotal’s analysis stats, generating human-readable verdicts (SAFE, WARNING, or DANGER) that explain *why* a link might be suspicious.\n\nFor persistence, I chose Apache Cassandra as the audit logging backend. While a simple SQL database could suffice for small scales, Cassandra provides a distributed, high-availability architecture capable of handling write-heavy scan logs with minimal latency, ensuring the system remains responsive even as the audit trail grows.\n\nThe entire ecosystem is containerized via Docker and Docker Compose, managing the complex system-level dependencies required for image processing (libzbar) while orchestrating the communication between the Streamlit frontend and the distributed NoSQL cluster.\n\nStack: Streamlit, Apache Cassandra, Google Gemini, VirusTotal API, Python, Docker.",
-        "metadata": {
-            "project": "QR Security Scanner",
-            "stack": [
-                "Streamlit",
-                "Apache Cassandra",
-                "Google Gemini",
-                "VirusTotal API",
-                "Python",
-                "Docker"
-            ],
-            "domain": "Cybersecurity",
-            "keywords": [
-                "QR Scanning",
-                "Threat Intelligence",
-                "LLM Reasoning",
-                "NoSQL Persistence",
-                "Cassandra",
-                "VirusTotal Integration",
-                "Image Processing",
-                "Dockerized Microservices"
-            ],
-            "production": false,
-            "priority": "high"
-        }
-    },
-    {
-        "doc_type": "project",
-        "title": "Portfolio Backend & AI Chatbot",
-        "content": "A FastAPI portfolio backend and agentic chatbot serving as an interactive resume, delivering citation-backed, non-hallucinatory answers about my engineering background.To guarantee low latency and resilience, I implemented a dual-LLM routing pipeline. It dynamically routes queries to Groq (using high-speed Qwen models) for sub-second execution, falling back to Google Gemini if rate limits are hit or failures occur.A key engineering challenge was context drift in multi-turn conversations. To resolve this, I built a stateful, multi-stage pipeline: incoming queries pass through scope-checking guardrails, chat history is condensed into a search query, and an FAQ database is checked first to avoid unnecessary LLM calls.For retrieval, the system uses a hybrid approach. It integrates a semantic vector search (leveraging Hugging Face's 384-dimensional all-MiniLM-L6-v2 embeddings via sqlite-vec) with SQLite FTS5 lexical keyword search. I coupled this with a custom SQLite-backed Knowledge Graph that extracts query entities and boosts related documents by 15%, injecting structured relational facts directly into the prompt.\n\nStack: FastAPI, SQLite, sqlite-vec, Groq, Google Gemini, Hugging Face, Python.",
-        "metadata": {
-            "project": "Portfolio Backend & AI Chatbot",
-            "stack": [
-                "FastAPI",
-                "SQLite",
-                "sqlite-vec",
-                "Groq",
-                "Google Gemini",
-                "Hugging Face",
-                "Python"
-            ],
-            "domain": "AI / backend infrastructure",
-            "keywords": [
-                "FastAPI",
-                "hybrid retrieval",
-                "Knowledge Graph",
-                "sqlite-vec",
-                "FTS5",
-                "RAG",
-                "model routing",
-                "dual-LLM",
-                "guardrails",
-                "conversational agent"
-            ],
-            "production": false,
-            "priority": "high"
-        }
-    },
-    {
-        "doc_type": "profile",
-        "title": "Professional Background",
-        "content": "Abhinav Kurup is a software engineer with 2 years of experience in backend engineering and applied AI. He has shipped 2 backend systems into production that are actively used in live operational environments.\n\nOn the backend side, he has built APIs using Django and FastAPI, worked with PostgreSQL (including geospatial systems with PostGIS), and used async patterns, WebSockets, task queues (Celery + Redis), and AWS infrastructure. He holds an AWS cloud certification.\n\nOn the AI side, he has built RAG pipelines, agentic workflows with LangGraph, and document intelligence systems — working with ChromaDB, Hugging Face models, and LLM-based systems focused on retrieval quality and grounded generation.\n\nHe is currently targeting backend and AI engineering roles in teams building intelligent systems, LLM-powered products, and production-grade backend infrastructure.",
-        "metadata": {
-            "stack": [
-                "Python",
-                "Django",
-                "FastAPI",
-                "PostgreSQL",
-                "Redis",
-                "AWS",
-                "Docker",
-                "WebSockets",
-                "LLMs",
-                "LangGraph",
-                "ChromaDB",
-                "Celery",
-                "PostGIS"
-            ],
-            "domain": "professional background",
-            "keywords": [
-                "backend engineer",
-                "AI engineer",
-                "Python",
-                "Django",
-                "FastAPI",
-                "RAG",
-                "LLM",
-                "LangGraph",
-                "PostgreSQL",
-                "AWS",
-                "real-time systems",
-                "production systems",
-                "REST API",
-                "WebSockets",
-                "Celery",
-                "Redis"
-            ],
-            "production_systems": 2,
-            "certifications": [
-                "AWS"
-            ],
-            "priority": "high"
-        }
-    },
-    {
-        "doc_type": "education",
-        "title": "Educational Background",
-        "content": "Abhinav Kurup completed his Bachelor of Engineering in Computer Engineering from Goa College of Engineering (2020–2024) with a CGPA of 8.55. Before that, he completed Class XII under CBSE at Kendriya Vidyalaya No. 1, scoring 94.2%.",
-        "metadata": {
-            "degree": "B.E. in Computer Engineering",
-            "college": "Goa College of Engineering",
-            "cgpa": 8.55,
-            "graduation_year": 2024,
-            "school": "Kendriya Vidyalaya No. 1",
-            "board": "CBSE",
-            "class_xii_percentage": 94.2,
-            "education_periods": {
-                "engineering": "2020-2024",
-                "higher_secondary": "2018-2020"
-            },
-            "domain": "education",
-            "priority": "high"
-        }
+  {
+    "doc_type": "project",
+    "title": "CollabWrite",
+    "content": "CollabWrite is a real-time collaborative document editing backend built to handle multiple users editing the same document simultaneously with minimal latency.\n\nThe core challenge was concurrent editing without conflicts. The backend uses a custom character-level CRDT (Conflict-free Replicated Data Type) — each character gets a unique identity based on a site ID, counter, and timestamp. Two users can insert text at the same position at the exact same time, and both clients always end up with the same final document, no locking or rollback needed.\n\nReal-time communication runs over FastAPI WebSockets with persistent connections per document session. Clients receive incremental updates the moment another user makes a change, with cursor positions and user presence tracked across sessions.\n\nDatabase write pressure was a real problem — every keystroke hitting PostgreSQL directly would cause lock contention. Live document state is stored in Redis and flushed to PostgreSQL periodically through an async background loop. Moving document state to Redis makes the architecture a true distributed system. Multiple server instances can share and synchronize document state through a centralized store, enabling horizontal scaling without binding sessions or application state to a single server instance.\n\nThe system also supports AI-assisted editing like paraphrasing via Hugging Face models, with inference running in a thread-pool executor so it never blocks the WebSocket event loop.\n\nStack: FastAPI, WebSockets, PostgreSQL, Redis, Python, Hugging Face.",
+    "metadata": {
+      "project": "CollabWrite",
+      "stack": [
+        "FastAPI",
+        "WebSockets",
+        "PostgreSQL",
+        "Redis",
+        "Python",
+        "Hugging Face"
+      ],
+      "domain": "real-time collaboration",
+      "keywords": [
+        "CRDT",
+        "real-time sync",
+        "WebSockets",
+        "concurrent editing",
+        "conflict resolution",
+        "async Python",
+        "Redis",
+        "distributed state management",
+        "horizontal scaling"
+      ],
+      "production": false,
+      "priority": "high"
     }
+  },
+  {
+    "doc_type": "project",
+    "title": "DocuMind",
+    "content": "DocuMind is a production-oriented document Q&A platform built on a local-first LLM stack. It enables natural-language querying over uploaded PDFs with full auditability, grounded citations, and modular multi-agent orchestration via LangGraph.## Core Architecture### Multi-Agent Pipeline (LangGraph StateGraph)The system decomposes document Q&A into discrete, failure-isolated stages: query routing → hybrid retrieval → optional structured extraction → response synthesis → optional tool calls. Single-stage failures (e.g. extraction or tool invocation) do not cascade — each agent contributes to a shared state object and logs an audit entry independently.### Hybrid Retrieval EngineRetrieval goes beyond naive single-query embedding lookup. Complex user queries are decomposed into optimised sub-queries via a query planning step, then run through a two-pronged retrieval strategy:- Dense retrieval — semantic vector search over ChromaDB embeddings (all-MiniLM-L6-v2)- Sparse retrieval — BM25 keyword fallback for exact-match and low-frequency term coverageResults are merged, deduplicated on chunk overlap, and optionally reranked with a Cross-Encoder for precision. This hybrid approach meaningfully improves recall on multi-faceted, ambiguous, or domain-specific queries compared to vector-only RAG.### Speech I/O Adapters Voice queries are transcribed using OpenAI Whisper, a robust STT model that handles accented speech and noisy audio well. Responses are played back via a HuggingFace SpeechT5 pipeline — using SpeechT5ForTextToSpeech for synthesis, SpeechT5HifiGan as the vocoder, and SpeechT5Processor for input preprocessing — keeping the entire speech stack local and dependency-contained. ### Grounded Generation with CitationsRetrieved chunks carry rich metadata (source filename, page number, chunk index). LLM prompts are constructed with citation guardrails enforcing that every factual claim maps back to a specific document and page. Answers are traceable by design, not by convention.## Retrieval - Dense + BM25 hybrid, query decomposition, chunk dedup, Cross-Encoder reranking , Orchestration- LangGraph StateGraph with per-agent audit accumulation , Inference - Ollama (local, on-prem) with Groq as optional hosted fallback , Ingestion , PyMuPDF parsing + recursive chunker preserving semantic boundaries , Storage , ChromaDB with page-level metadata for precise citation , Logging , JSONL audit trail per query — every agent step is inspectable , I/O STT/TTS adapters for voice queries and reply playback , Output control , Structured LLM output adapters for controlled, parseable responses ,## Why It's Built This Way- Hybrid retrieval over pure vector search — BM25 catches what embeddings miss on rare terms and exact phrases; the combination improves end-to-end answer quality on real-world heterogeneous documents.- Query planning — decomposing compound questions into sub-queries prevents single-embedding bottlenecks and improves coverage across large document corpora.- Local-first inference — Ollama integration keeps sensitive documents off third-party servers; Groq fallback is opt-in for speed/cost tradeoffs.- Audit trails — JSONL logging makes the system debuggable in production and defensible in regulated or enterprise contexts.- Modular failure isolation — LangGraph's graph structure means retrieval failures, tool errors, and extraction failures are handled per-stage rather than failing the whole pipeline.",
+    "metadata": {
+      "project": "DocuMind",
+      "stack": [
+        "LangGraph",
+        "LangChain",
+        "Ollama (local LLMs)",
+        "Groq (optional hosted)",
+        "ChromaDB",
+        "sentence-transformers (all-MiniLM-L6-v2)",
+        "CrossEncoder (optional reranker)",
+        "BM25 (keyword fallback)",
+        "Speech (STT/TTS adapters)"
+      ],
+      "domain": "AI / document intelligence",
+      "keywords": [
+        "RAG",
+        "hybrid retrieval",
+        "BM25",
+        "Cross-Encoder reranking",
+        "LangGraph",
+        "multi-agent pipeline",
+        "vector search",
+        "ChromaDB",
+        "Ollama",
+        "citation guardrails",
+        "speech-to-text",
+        "text-to-speech",
+        "JSONL audit trail",
+        "tool calls"
+      ],
+      "production": false,
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "project",
+    "title": "MCP Financial Analyst",
+    "content": "MCP Financial Analyst is an agentic, tool-driven financial analysis system that answers natural-language investment and technical-analysis questions with verifiable data and fully transparent tool traces. The system orchestrates lightweight MCP servers covering prices, technical indicators, news sentiment, fundamentals, and chart generation, then synthesizes a structured markdown report that always points back to the concrete tool calls and data behind each claim. Agentic Pipeline (LangGraph — Reason → Act → Synthesize)A stateful three-stage LangGraph pipeline separates reasoning (plan which tools to call), acting (execute against live MCP endpoints), and synthesis (build the report only after verified tool results are in hand). Partial failures are isolated per stage — a failed indicator call does not block price or sentiment results. Dynamic Tool Creation Every MCP server publishes a JSON schema; the orchestrator builds Pydantic-backed LangChain StructuredTools at runtime. Adding a new MCP server requires zero changes to the orchestrator — it is immediately discoverable and callable. MCP Client & Model Routing An SSE-backed MCPClientManager on AsyncExitStack handles tool listing, invocation, argument normalization, and output compaction across servers. A litellm ChatLiteLLMRouter blends Groq and Gemini with weighted shuffle routing for reliability and cost control — no single-provider lock-in. Orchestration  LangGraph reason → act → synthesize with per-stage failure isolation Tool layer  Runtime StructuredTool creation from MCP JSON schemas via Pydantic MCP client  SSE AsyncExitStack with argument normalization and output compaction  Model routing  litellm Router across Groq and Gemini with weighted shuffle  Financial data  yfinance (prices), pandas_ta (indicators), sentiment, fundamentals  Auditability  tool_calls_made, tool_results, reasoning_steps, charts on every response  UI  Streamlit with inline chart rendering and expandable tool call panels - Staged pipeline over single-shot prompting — separating reasoning, acting, and synthesis prevents the model from hallucinating data it has not yet retrieved. Dynamic tool binding — MCP schema-driven approach scales to new data sources without touching orchestrator logic. Model routing litellm abstracts provider differences and handles failover across Groq and Gemini. Auditable outputs by default — tool calls, results, and reasoning steps are first-class response fields, making answer provenance fully traceable.",
+    "metadata": {
+      "project": "MCP Financial Analyst",
+      "stack": [
+        "Python",
+        "FastAPI",
+        "LangGraph",
+        "LangChain",
+        "MCP (FastMCP / SSE)",
+        "litellm (Router)",
+        "ChatLiteLLMRouter",
+        "Groq",
+        "Gemini",
+        "pandas_ta"
+      ],
+      "domain": "AI / finance / agentic tool orchestration",
+      "keywords": [
+        "agentic orchestration",
+        "MCP",
+        "FastMCP",
+        "SSE",
+        "LangGraph",
+        "LangChain",
+        "litellm",
+        "model routing",
+        "Groq",
+        "Gemini",
+        "chart generation",
+        "base64 PNG",
+        "tool-call audit"
+      ],
+      "production": false,
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "project",
+    "title": "E-Beat",
+    "content": "E-Beat is a production geospatial operations platform built for law enforcement field coordination. It started with winning a Goa Police hackathon — after the win, the team was brought on to actually build and ship the platform, which is now live and used in real operational environments.\n\nThe platform centralizes officer tracking, task assignment, field reporting, and administrative coordination into one backend system organized around spatial boundaries — districts, stations, and beat areas.\n\nThe geospatial layer uses PostGIS for hierarchical spatial modeling, with strict constraints ensuring tasks can only be assigned within valid jurisdictional boundaries — enforced at the data model level, not just in application logic.\n\nReal-time officer location tracking was a hard infrastructure problem. High-frequency GPS updates from field devices would have overwhelmed a relational database. The solution was a hybrid architecture: PostgreSQL and PostGIS handle structured operational data, while Firebase Realtime Database handles the live location stream — keeping the map responsive without polluting the operational database.\n\nThe platform also includes a staged approval workflow where field-submitted spatial records land in a staging table first and are promoted to production only after supervisor approval, preventing bad data from affecting live operations.\n\nStack: Django, PostgreSQL, PostGIS, Firebase, AWS. Shipped into production, actively used in live law enforcement operations.",
+    "metadata": {
+      "project": "E-Beat",
+      "stack": [
+        "Django",
+        "PostgreSQL",
+        "PostGIS",
+        "Firebase",
+        "AWS"
+      ],
+      "domain": "geospatial operations",
+      "keywords": [
+        "PostGIS",
+        "geospatial",
+        "real-time tracking",
+        "Django",
+        "Firebase",
+        "spatial queries",
+        "production",
+        "law enforcement",
+        "hybrid architecture",
+        "GIS"
+      ],
+      "production": true,
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "project",
+    "title": "Workforce and Event Management Platform",
+    "content": "A production workforce and event management platform built as a freelance engagement to replace fragmented manual workflows with a centralized backend system. It handles employee coordination, event assignments, attendance tracking, and reporting — actively used in live business operations.\n\nLong-running tasks like report generation and bulk exports are offloaded to Celery workers backed by Redis, running completely outside the request cycle so users aren't blocked waiting for heavy jobs.\n\nA key engineering problem was memory exhaustion during large exports — reports with thousands of records were crashing workers. The fix was streamed in-memory processing using BytesIO and sequential archive generation, building exports incrementally instead of loading everything at once. This made large exports stable and reliable.\n\nThe platform uses Django Channels with a Redis channel layer for real-time WebSocket connections from attendance hardware and live dashboards.\n\nDeployments run on AWS with a Blue-Green pipeline using GitHub Actions, ECR, CodeDeploy, and ECS on EC2 behind an Application Load Balancer — zero-downtime releases with fast rollback via traffic cutover.\n\nStack: Django, PostgreSQL, AWS, Celery, Redis, Django Channels. Shipped into production, used in live business operations.",
+    "metadata": {
+      "project": "Workforce and Event Management Platform",
+      "stack": [
+        "Django",
+        "PostgreSQL",
+        "AWS",
+        "Celery",
+        "Redis",
+        "Django Channels"
+      ],
+      "domain": "workforce and event operations",
+      "keywords": [
+        "Django",
+        "Celery",
+        "Redis",
+        "WebSockets",
+        "AWS ECS",
+        "blue-green deployment",
+        "async task queue",
+        "production",
+        "real-time",
+        "CI/CD"
+      ],
+      "production": true,
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "project",
+    "title": "QRGuard: AI-Powered QR Security Scanner",
+    "content": "QRGuard is a real-time threat detection system designed to protect users from malicious links embedded in QR codes. It bridges the gap between raw threat intelligence and user-friendly security advice by combining traditional URL reputation checks with LLM-based semantic analysis.\n\nThe core technical challenge was translating fragmented security metrics from multiple threat engines into actionable verdicts. The system decodes QR data using `pyzbar` and cross-references extracted URLs with the VirusTotal API. To provide more than just a binary 'safe/unsafe' output, I integrated Google Gemini to perform real-time reasoning over VirusTotal’s analysis stats, generating human-readable verdicts (SAFE, WARNING, or DANGER) that explain *why* a link might be suspicious.\n\nFor persistence, I chose Apache Cassandra as the audit logging backend. While a simple SQL database could suffice for small scales, Cassandra provides a distributed, high-availability architecture capable of handling write-heavy scan logs with minimal latency, ensuring the system remains responsive even as the audit trail grows.\n\nThe entire ecosystem is containerized via Docker and Docker Compose, managing the complex system-level dependencies required for image processing (libzbar) while orchestrating the communication between the Streamlit frontend and the distributed NoSQL cluster.\n\nStack: Streamlit, Apache Cassandra, Google Gemini, VirusTotal API, Python, Docker.",
+    "metadata": {
+      "project": "QR Security Scanner",
+      "stack": [
+        "Streamlit",
+        "Apache Cassandra",
+        "Google Gemini",
+        "VirusTotal API",
+        "Python",
+        "Docker"
+      ],
+      "domain": "Cybersecurity",
+      "keywords": [
+        "QR Scanning",
+        "Threat Intelligence",
+        "LLM Reasoning",
+        "NoSQL Persistence",
+        "Cassandra",
+        "VirusTotal Integration",
+        "Image Processing",
+        "Dockerized Microservices"
+      ],
+      "production": false,
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "project",
+    "title": "Portfolio Backend & AI Chatbot",
+    "content": "A FastAPI portfolio backend and agentic chatbot serving as an interactive resume, delivering citation-backed, non-hallucinatory answers about my engineering background.To guarantee low latency and resilience, I implemented a dual-LLM routing pipeline. It dynamically routes queries to Groq (using high-speed Qwen models) for sub-second execution, falling back to Google Gemini if rate limits are hit or failures occur.A key engineering challenge was context drift in multi-turn conversations. To resolve this, I built a stateful, multi-stage pipeline: incoming queries pass through scope-checking guardrails, chat history is condensed into a search query, and an FAQ database is checked first to avoid unnecessary LLM calls.For retrieval, the system uses a hybrid approach. It integrates a semantic vector search (leveraging Hugging Face's 384-dimensional all-MiniLM-L6-v2 embeddings via sqlite-vec) with SQLite FTS5 lexical keyword search. I coupled this with a custom SQLite-backed Knowledge Graph that extracts query entities and boosts related documents by 15%, injecting structured relational facts directly into the prompt.\n\nStack: FastAPI, SQLite, sqlite-vec, Groq, Google Gemini, Hugging Face, Python.",
+    "metadata": {
+      "project": "Portfolio Backend & AI Chatbot",
+      "stack": [
+        "FastAPI",
+        "SQLite",
+        "sqlite-vec",
+        "Groq",
+        "Google Gemini",
+        "Hugging Face",
+        "Python"
+      ],
+      "domain": "AI / backend infrastructure",
+      "keywords": [
+        "FastAPI",
+        "hybrid retrieval",
+        "Knowledge Graph",
+        "sqlite-vec",
+        "FTS5",
+        "RAG",
+        "model routing",
+        "dual-LLM",
+        "guardrails",
+        "conversational agent"
+      ]
+    }
+  },
+  {
+    "doc_type": "profile",
+    "title": "Professional Background",
+    "content": "Abhinav Kurup is a software engineer with 2 years of experience in backend engineering and applied AI. He has shipped 2 backend systems into production that are actively used in live operational environments.\n\nOn the backend side, he has built APIs using Django and FastAPI, worked with PostgreSQL (including geospatial systems with PostGIS), and used async patterns, WebSockets, task queues (Celery + Redis), and AWS infrastructure. He holds an AWS cloud certification.\n\nOn the AI side, he has built RAG pipelines, agentic workflows with LangGraph, and document intelligence systems — working with ChromaDB, Hugging Face models, and LLM-based systems focused on retrieval quality and grounded generation.\n\nHe is currently targeting backend and AI engineering roles in teams building intelligent systems, LLM-powered products, and production-grade backend infrastructure.",
+    "metadata": {
+      "stack": [
+        "Python",
+        "Django",
+        "FastAPI",
+        "PostgreSQL",
+        "Redis",
+        "AWS",
+        "Docker",
+        "WebSockets",
+        "LLMs",
+        "LangGraph",
+        "ChromaDB",
+        "Celery",
+        "PostGIS"
+      ],
+      "domain": "professional background",
+      "keywords": [
+        "backend engineer",
+        "AI engineer",
+        "Python",
+        "Django",
+        "FastAPI",
+        "RAG",
+        "LLM",
+        "LangGraph",
+        "PostgreSQL",
+        "AWS",
+        "real-time systems",
+        "production systems",
+        "REST API",
+        "WebSockets",
+        "Celery",
+        "Redis"
+      ],
+      "production_systems": 2,
+      "certifications": [
+        "AWS"
+      ],
+      "priority": "high"
+    }
+  },
+  {
+    "doc_type": "education",
+    "title": "Educational Background",
+    "content": "Abhinav Kurup completed his Bachelor of Engineering in Computer Engineering from Goa College of Engineering (2020–2024) with a CGPA of 8.55. Before that, he completed Class XII under CBSE at Kendriya Vidyalaya No. 1, scoring 94.2%.",
+    "metadata": {
+      "degree": "B.E. in Computer Engineering",
+      "college": "Goa College of Engineering",
+      "cgpa": 8.55,
+      "graduation_year": 2024,
+      "school": "Kendriya Vidyalaya No. 1",
+      "board": "CBSE",
+      "class_xii_percentage": 94.2,
+      "education_periods": {
+        "engineering": "2020-2024",
+        "higher_secondary": "2018-2020"
+      },
+      "domain": "education",
+      "priority": "high"
+    }
+  }
 ]
