@@ -29,10 +29,10 @@
       "priority": "high"
     }
   },
-  {
+    {
     "doc_type": "project",
     "title": "DocuMind",
-    "content": "DocuMind is a production-oriented document Q&A platform built on a local-first LLM stack. It enables natural-language querying over uploaded PDFs with full auditability, grounded citations, and modular multi-agent orchestration via LangGraph.## Core Architecture### Multi-Agent Pipeline (LangGraph StateGraph)The system decomposes document Q&A into discrete, failure-isolated stages: query routing → hybrid retrieval → optional structured extraction → response synthesis → optional tool calls. Single-stage failures (e.g. extraction or tool invocation) do not cascade — each agent contributes to a shared state object and logs an audit entry independently.### Hybrid Retrieval EngineRetrieval goes beyond naive single-query embedding lookup. Complex user queries are decomposed into optimised sub-queries via a query planning step, then run through a two-pronged retrieval strategy:- Dense retrieval — semantic vector search over ChromaDB embeddings (all-MiniLM-L6-v2)- Sparse retrieval — BM25 keyword fallback for exact-match and low-frequency term coverageResults are merged, deduplicated on chunk overlap, and optionally reranked with a Cross-Encoder for precision. This hybrid approach meaningfully improves recall on multi-faceted, ambiguous, or domain-specific queries compared to vector-only RAG.### Speech I/O Adapters Voice queries are transcribed using OpenAI Whisper, a robust STT model that handles accented speech and noisy audio well. Responses are played back via a HuggingFace SpeechT5 pipeline — using SpeechT5ForTextToSpeech for synthesis, SpeechT5HifiGan as the vocoder, and SpeechT5Processor for input preprocessing — keeping the entire speech stack local and dependency-contained. ### Grounded Generation with CitationsRetrieved chunks carry rich metadata (source filename, page number, chunk index). LLM prompts are constructed with citation guardrails enforcing that every factual claim maps back to a specific document and page. Answers are traceable by design, not by convention.## Retrieval - Dense + BM25 hybrid, query decomposition, chunk dedup, Cross-Encoder reranking , Orchestration- LangGraph StateGraph with per-agent audit accumulation , Inference - Ollama (local, on-prem) with Groq as optional hosted fallback , Ingestion , PyMuPDF parsing + recursive chunker preserving semantic boundaries , Storage , ChromaDB with page-level metadata for precise citation , Logging , JSONL audit trail per query — every agent step is inspectable , I/O STT/TTS adapters for voice queries and reply playback , Output control , Structured LLM output adapters for controlled, parseable responses ,## Why It's Built This Way- Hybrid retrieval over pure vector search — BM25 catches what embeddings miss on rare terms and exact phrases; the combination improves end-to-end answer quality on real-world heterogeneous documents.- Query planning — decomposing compound questions into sub-queries prevents single-embedding bottlenecks and improves coverage across large document corpora.- Local-first inference — Ollama integration keeps sensitive documents off third-party servers; Groq fallback is opt-in for speed/cost tradeoffs.- Audit trails — JSONL logging makes the system debuggable in production and defensible in regulated or enterprise contexts.- Modular failure isolation — LangGraph's graph structure means retrieval failures, tool errors, and extraction failures are handled per-stage rather than failing the whole pipeline.",
+    "content": "DocuMind is a production-oriented document Q&A platform built on a local-first LLM stack. It enables natural-language querying over uploaded PDFs with full auditability, grounded citations, and modular multi-agent orchestration via LangGraph. ## Core Architecture ### Multi-Agent Pipeline (LangGraph StateGraph) The system decomposes document Q&A into discrete, failure-isolated stages: query routing → hybrid retrieval → optional structured extraction → response synthesis → optional tool calls. Utilizing a LangGraph StateGraph with per-agent audit accumulation, single-stage failures do not cascade; each agent contributes to a shared state object and logs an independent audit entry, ensuring modular failure isolation. ### Hybrid Retrieval Engine To handle heterogeneous documents, complex user queries are decomposed into optimized sub-queries via a query planning step to bypass single-embedding bottlenecks. Ingestion uses PyMuPDF parsing with a recursive chunker to preserve semantic boundaries. The retrieval engine then executes a two-pronged strategy: - Dense retrieval: Semantic vector search over ChromaDB embeddings (all-MiniLM-L6-v2) utilizing page-level metadata for precise citation. - Sparse retrieval: BM25 keyword fallback to capture rare terms and exact phrases that embeddings miss. Results are merged, deduplicated on chunk overlap, and reranked with a Cross-Encoder for precision, meaningfully improving recall over vector-only RAG. ### Speech I/O Adapters Voice queries are transcribed using OpenAI Whisper for robust STT handling of accented or noisy audio. Responses are played back via a local HuggingFace SpeechT5 pipeline (SpeechT5ForTextToSpeech, SpeechT5HifiGan vocoder, and SpeechT5Processor), keeping the entire speech stack dependency-contained. ### Grounded Generation & Production Guardrails Retrieved chunks carry source metadata (filename, page number, chunk index). LLM prompts enforce strict citation guardrails, making answers traceable by design. Local-first inference via Ollama keeps sensitive documents off third-party servers, with Groq as an opt-in hosted fallback for cost/speed tradeoffs. For production debugging and compliance, the system records an inspectable, structured JSONL audit trail of every agent step.",
     "metadata": {
       "project": "DocuMind",
       "stack": [
@@ -68,43 +68,43 @@
     }
   },
   {
-    "doc_type": "project",
-    "title": "MCP Financial Analyst",
-    "content": "MCP Financial Analyst is an agentic, tool-driven financial analysis system that answers natural-language investment and technical-analysis questions with verifiable data and fully transparent tool traces. The system orchestrates lightweight MCP servers covering prices, technical indicators, news sentiment, fundamentals, and chart generation, then synthesizes a structured markdown report that always points back to the concrete tool calls and data behind each claim. Agentic Pipeline (LangGraph — Reason → Act → Synthesize)A stateful three-stage LangGraph pipeline separates reasoning (plan which tools to call), acting (execute against live MCP endpoints), and synthesis (build the report only after verified tool results are in hand). Partial failures are isolated per stage — a failed indicator call does not block price or sentiment results. Dynamic Tool Creation Every MCP server publishes a JSON schema; the orchestrator builds Pydantic-backed LangChain StructuredTools at runtime. Adding a new MCP server requires zero changes to the orchestrator — it is immediately discoverable and callable. MCP Client & Model Routing An SSE-backed MCPClientManager on AsyncExitStack handles tool listing, invocation, argument normalization, and output compaction across servers. A litellm ChatLiteLLMRouter blends Groq and Gemini with weighted shuffle routing for reliability and cost control — no single-provider lock-in. Orchestration  LangGraph reason → act → synthesize with per-stage failure isolation Tool layer  Runtime StructuredTool creation from MCP JSON schemas via Pydantic MCP client  SSE AsyncExitStack with argument normalization and output compaction  Model routing  litellm Router across Groq and Gemini with weighted shuffle  Financial data  yfinance (prices), pandas_ta (indicators), sentiment, fundamentals  Auditability  tool_calls_made, tool_results, reasoning_steps, charts on every response  UI  Streamlit with inline chart rendering and expandable tool call panels - Staged pipeline over single-shot prompting — separating reasoning, acting, and synthesis prevents the model from hallucinating data it has not yet retrieved. Dynamic tool binding — MCP schema-driven approach scales to new data sources without touching orchestrator logic. Model routing litellm abstracts provider differences and handles failover across Groq and Gemini. Auditable outputs by default — tool calls, results, and reasoning steps are first-class response fields, making answer provenance fully traceable.",
-    "metadata": {
-      "project": "MCP Financial Analyst",
-      "stack": [
-        "Python",
-        "FastAPI",
-        "LangGraph",
-        "LangChain",
-        "MCP (FastMCP / SSE)",
-        "litellm (Router)",
-        "ChatLiteLLMRouter",
-        "Groq",
-        "Gemini",
-        "pandas_ta"
-      ],
-      "domain": "AI / finance / agentic tool orchestration",
-      "keywords": [
-        "agentic orchestration",
-        "MCP",
-        "FastMCP",
-        "SSE",
-        "LangGraph",
-        "LangChain",
-        "litellm",
-        "model routing",
-        "Groq",
-        "Gemini",
-        "chart generation",
-        "base64 PNG",
-        "tool-call audit"
-      ],
-      "production": false,
-      "priority": "high"
-    }
-  },
+  "doc_type": "project",
+  "title": "MCP Financial Analyst",
+  "content": "MCP Financial Analyst is an agentic, tool-driven financial analysis system that answers natural-language investment and technical-analysis questions with verifiable data and transparent tool traces. The system orchestrates lightweight MCP servers covering prices, technical indicators, news sentiment, fundamentals, and chart generation, synthesizing a structured markdown report linked directly to concrete tool data. The architecture utilizes a stateful, three-stage LangGraph pipeline separating reasoning (planning tool calls), acting (executing against live MCP endpoints), and synthesis (building the final report). Staging prevents hallucinations by ensuring tool results are in hand before generation, while isolating partial failures so a broken indicator call won't block price or sentiment results. To eliminate provider lock-in, a litellm ChatLiteLLMRouter blends Groq and Gemini with weighted shuffle routing for automated failover, cost control, and sub-second execution resilience. Tool integration is fully dynamic: every MCP server publishes a JSON schema from which the orchestrator constructs Pydantic-backed LangChain StructuredTools at runtime, allowing new data sources to scale without modifying core pipeline logic. For end-to-end provenance, an SSE-backed MCPClientManager running on an AsyncExitStack handles tool listing, invocation, argument normalization, and output compaction. Outputs are completely auditable by default, storing tool calls, results, and reasoning steps as first-class fields rendered via a Streamlit UI featuring inline chart rendering and expandable tool call panels.",
+  "metadata": {
+    "project": "MCP Financial Analyst",
+    "stack": [
+      "Python",
+      "FastAPI",
+      "LangGraph",
+      "LangChain",
+      "MCP (FastMCP / SSE)",
+      "litellm (Router)",
+      "ChatLiteLLMRouter",
+      "Groq",
+      "Gemini",
+      "pandas_ta"
+    ],
+    "domain": "AI / finance / agentic tool orchestration",
+    "keywords": [
+      "agentic orchestration",
+      "MCP",
+      "FastMCP",
+      "SSE",
+      "LangGraph",
+      "LangChain",
+      "litellm",
+      "model routing",
+      "Groq",
+      "Gemini",
+      "chart generation",
+      "base64 PNG",
+      "tool-call audit"
+    ],
+    "production": false,
+    "priority": "high"
+  }
+},
   {
     "doc_type": "project",
     "title": "E-Beat",
