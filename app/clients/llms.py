@@ -15,8 +15,8 @@ class LLMClient:
     def __init__(self):
         # Weights for final answer (chat)
         self.chat_weights = {
-            "groq": 0.7,
-            "gemini": 0.3
+            "groq": 0.9,
+            "gemini": 0.1
         }
 
     def _get_structured_model(self, provider: str):
