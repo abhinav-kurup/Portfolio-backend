@@ -2,24 +2,69 @@ from __future__ import annotations
 
 from sqlite3 import Connection
 from app.core.logging import setup_logging
+from pydantic import BaseModel, Field
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+from app.core.config import settings
 
 logger = setup_logging()
 
+class QueryEntities(BaseModel):
+    entities: list[str] = Field(description="List of key entities extracted from the query. Focus on names of people, projects, skills, technologies, and core concepts.")
+
 def extract_query_entities(query: str, db: Connection) -> list[int]:
     """
-    Simple entity lookup: find kg_entities whose name appears in the query.
-    (You can upgrade this to NER or embedding similarity later.)
+    LLM-based NER: use an LLM to extract entities from the query, 
+    then match them against the kg_entities table.
     """
-    words = query.lower().split()
-    rows = db.execute(
-        "SELECT id, name FROM kg_entities"
-    ).fetchall()
+    provider = settings.PRIMARY_LLM_PROVIDER
+    model = settings.PRIMARY_LLM_MODEL
+
+    if provider == "groq":
+        llm = ChatGroq(
+            model=model,
+            max_tokens=250,
+            temperature=0.0,
+            api_key=settings.GROK_API_KEY
+        )
+    elif provider == "google":
+        llm = ChatGoogleGenerativeAI(
+            model=model,
+            max_tokens=200,
+            temperature=0.0,
+            api_key=settings.GEMINI_API_KEY
+        )
+    else:
+        raise ValueError(f"Unsupported LLM provider: {provider}")
+        
+    structured_llm = llm.with_structured_output(QueryEntities)
+    prompt = f"Extract the key entities from the following query to use for a knowledge graph search:\n\nQuery: {query}"
+    
+    extracted_names = []
+    try:
+        response = structured_llm.invoke(prompt)
+        extracted_names = [e.lower() for e in response.entities]
+        logger.info(f"  [KG] LLM extracted entities: {extracted_names}")
+    except Exception as e:
+        logger.error(f"Failed to extract entities using LLM: {e}")
+        return []
+
+    if not extracted_names:
+        return []
+
+    rows = db.execute("SELECT id, name FROM kg_entities").fetchall()
 
     matched_ids = []
     for row in rows:
-        if row["name"].lower() in query.lower():
-            matched_ids.append(row["id"])
-            logger.debug(f"  [KG] Matched entity: {row['name']} (id={row['id']})")
+        db_name = row["name"].lower()
+        # Strict match but allowing for simple plurals
+        if (db_name in extracted_names or 
+            db_name + "s" in extracted_names or 
+            db_name.rstrip("s") in extracted_names):
+            
+            if row["id"] not in matched_ids:
+                matched_ids.append(row["id"])
+                logger.info(f"  [KG] Matched DB entity: {row['name']} (id={row['id']})")
 
     return matched_ids
 
@@ -27,7 +72,7 @@ def extract_query_entities(query: str, db: Connection) -> list[int]:
 def get_related_doc_ids(
     entity_ids: list[int],
     db: Connection,
-    hops: int = 2,
+    hops: int = 1,
 ) -> set[int]:
     """
     Walk the graph up to `hops` levels from seed entities.

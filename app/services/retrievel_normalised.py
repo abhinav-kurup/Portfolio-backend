@@ -8,16 +8,16 @@ from app.clients.embeddings import embeddings_client
 from app.utils.similarity import serialize_vector
 from app.models.chat import RetrievedChunk
 from app.core.logging import setup_logging
-# from app.services.knowledge_graph.retriever import (
-#     extract_query_entities,
-#     get_related_doc_ids,
-# )
+from app.services.knowledge_graph.retriever import (
+    extract_query_entities,
+    get_related_doc_ids,
+)
 
 logger = setup_logging()
 
 SEMANTIC_WEIGHT = 0.7
 LEXICAL_WEIGHT = 0.3
-# GRAPH_BOOST = 0.15
+GRAPH_BOOST = 0.15
 
 
 def _vector_search(
@@ -130,6 +130,7 @@ def _fts_search(
 def retrieve_context(
     query: str,
     db: Connection,
+    seed_entity_ids: list[int] = None,
     limit: int = 3,
 ) -> list[RetrievedChunk]:
     """
@@ -156,8 +157,11 @@ def retrieve_context(
     candidate_ids = set(semantic_results.keys()) | set(lexical_scores.keys())
 
     # --- NEW: get graph-connected doc ids ---
-    # seed_entity_ids = extract_query_entities(query, db)
-    # graph_doc_ids   = get_related_doc_ids(seed_entity_ids, db)
+    if seed_entity_ids is None:
+        seed_entity_ids = extract_query_entities(query, db)
+    graph_doc_ids   = get_related_doc_ids(seed_entity_ids, db)
+
+    candidate_ids.update(graph_doc_ids)
 
     for doc_id in candidate_ids:
         semantic = semantic_results.get(doc_id, {}).get("score", 0.0)
@@ -192,9 +196,9 @@ def retrieve_context(
         hybrid_score = (SEMANTIC_WEIGHT * semantic) + (LEXICAL_WEIGHT * lexical)
 
         # --- NEW: boost docs connected via the knowledge graph ---
-        # if doc_id in graph_doc_ids:
-        #     hybrid_score = min(1.0, hybrid_score + GRAPH_BOOST)
-        #     logger.debug(f"  [KG Boost] doc_id={doc_id} boosted to {hybrid_score:.4f}")
+        if doc_id in graph_doc_ids:
+            hybrid_score = min(1.0, hybrid_score + GRAPH_BOOST)
+            logger.info(f"  [KG Boost] doc_id={doc_id} boosted to {hybrid_score:.4f}")
 
         doc["score"] = round(hybrid_score, 4)
 

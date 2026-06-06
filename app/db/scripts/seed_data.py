@@ -49,7 +49,7 @@ def seed_documents(conn):
     print("Seeding documents...")
 
     # file_path = "data/seed/documents.json"
-    file_path = "data/seed/doc2.json"
+    file_path = "data/seed/doc3.json"
     if not os.path.exists(file_path):
         print(f"  Warning: {file_path} not found. Skipping document seeding.")
         return
@@ -72,7 +72,9 @@ def seed_documents(conn):
             continue
 
         # Concatenate title, metadata fields, and content for a richer semantic vector
-        metadata_summary = f"Project: {metadata.get('project', '')}. Stack: {', '.join(metadata.get('stack', []))}. Domain: {metadata.get('domain', '')}."
+        keywords_list = metadata.get('keywords', [])
+        keywords_str = ', '.join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+        metadata_summary = f"Project: {metadata.get('project', '')}. Stack: {', '.join(metadata.get('stack', []))}. Domain: {metadata.get('domain', '')}. Keywords: {keywords_str}."
         text_to_embed = f"Title: {doc['title']}\nContext: {metadata_summary}\nContent: {doc['content']}"
         
         vector = embeddings_client.embed(text_to_embed)
@@ -97,8 +99,9 @@ def seed_documents(conn):
             """, (serialize_vector(vector), existing["id"]))
 
             # Update Knowledge Graph
-            # from app.services.knowledge_graph.builder import index_document_graph
-            # index_document_graph(doc_id=existing["id"], content=doc["content"], db=conn)
+            from app.services.knowledge_graph.builder import index_document_graph
+            graph_input = f"Title: {doc['title']}\nKeywords: {keywords_str}\nContent: {doc['content']}"
+            index_document_graph(doc_id=existing["id"], content=graph_input, db=conn)
 
             print(f"  Updated: {doc['title']}")
 
@@ -123,8 +126,9 @@ def seed_documents(conn):
             """, (doc_id, serialize_vector(vector)))
 
             # Index Knowledge Graph
-            # from app.services.knowledge_graph.builder import index_document_graph
-            # index_document_graph(doc_id=doc_id, content=doc["content"], db=conn)
+            from app.services.knowledge_graph.builder import index_document_graph
+            graph_input = f"Title: {doc['title']}\nKeywords: {keywords_str}\nContent: {doc['content']}"
+            index_document_graph(doc_id=doc_id, content=graph_input, db=conn)
 
             print(f"  Inserted: {doc['title']}")
 

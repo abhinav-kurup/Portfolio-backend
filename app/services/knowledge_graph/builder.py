@@ -30,7 +30,8 @@ Extract entities and relationships from the text below.
 
 Rules:
 - Entity names must be exact strings from the text
-- Predicates should be lowercase verbs: "uses", "built", "works_at", "knows", "led"
+- Predicates should be lowercase verbs: "uses", "built", "works_at", "knows", "led", "developed_by", "is_a"
+- If the text describes a project, explicitly create TWO relationships: [Project Name] -> "developed_by" -> "Abhinav Kurup", and [Project Name] -> "is_a" -> "Project"
 - Only extract high-confidence triples
 
 Text:
@@ -39,20 +40,25 @@ Text:
 
 def extract_graph(text: str) -> dict:
     """Call LLM to extract entities + relations from a document chunk."""
-    if settings.PRIMARY_LLM_PROVIDER == "groq":
+    provider = settings.PRIMARY_LLM_PROVIDER
+    model = settings.PRIMARY_LLM_MODEL
+
+    if provider == "groq":
         llm = ChatGroq(
-            model=settings.PRIMARY_LLM_MODEL,
+            model=model,
             max_tokens=1000,
             temperature=0.0,
             api_key=settings.GROK_API_KEY
+        )
+    elif provider == "google":
+        llm = ChatGoogleGenerativeAI(
+            model=model,
+            max_tokens=1000,
+            temperature=0.0,
+            api_key=settings.GEMINI_API_KEY
         )
     else:
-        llm = ChatGoogleGenerativeAI(
-            model=settings.PRIMARY_LLM_MODEL,
-            max_tokens=1000,
-            temperature=0.0,
-            api_key=settings.GROK_API_KEY
-        )
+        raise ValueError(f"Unsupported LLM provider: {provider}")
         
     structured_llm = llm.with_structured_output(GraphExtraction)
     prompt = EXTRACTION_PROMPT.format(text=text[:3000])
