@@ -37,6 +37,7 @@ If the follow-up question is already a standalone question, just repeat it exact
 Rules:
 - Do not answer the question
 - Do not add information not present in the conversation
+- Never add the name "Abhinav Kurup" or "Abhinav" to the question. Since this is a portfolio, assume all projects and experience belong to the owner.
 - Only output the rephrased question
 """
 

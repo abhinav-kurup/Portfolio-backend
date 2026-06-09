@@ -1,25 +1,82 @@
 from __future__ import annotations
 
+import re
 from sqlite3 import Connection
 from app.core.logging import setup_logging
 
 logger = setup_logging()
 
+# Aliases to map common variations to the canonical database names
+ALIASES = {
+    "postgres": "postgresql",
+    "js": "javascript",
+    "ts": "typescript",
+    "crdts": "crdt",
+    "websockets": "websocket",
+    "neural networks": "llms",
+    "large language models": "llms",
+    "llm": "llms",
+    "ai": "applied ai",
+    "doc QA": "document QA",
+    "cassandras": "cassandra",
+}
+
+# Entity types that trigger graph routing
+ROUTING_TYPES = {"TECHNOLOGY", "CONCEPT", "SKILL", "DOMAIN"}
+
+
 def extract_query_entities(query: str, db: Connection) -> list[int]:
     """
-    Simple entity lookup: find kg_entities whose name appears in the query.
-    (You can upgrade this to NER or embedding similarity later.)
+    Deterministic NER matching: Matches query against entities in the database
+    using case-insensitive substring and regex word boundaries.
+    Only returns entity IDs of types TECHNOLOGY, CONCEPT, SKILL, DOMAIN (graph routing).
     """
-    words = query.lower().split()
+    query = query.strip()
+    if not query:
+        return []
+
+    # 1. Fetch all unique entity names and types from database
     rows = db.execute(
-        "SELECT id, name FROM kg_entities"
+        "SELECT id, name, type FROM kg_entities"
     ).fetchall()
 
+    if not rows:
+        return []
+
+    q = query.lower()
+    
+    # 2. Check for alias matches and rewrite query tokens if needed
+    for alias, canonical in ALIASES.items():
+        if alias in q:
+            q += f" {canonical}"  # Append canonical name to help match it below
+
     matched_ids = []
+    matched_names = []
+
+    # 3. Match each database entity against the query
     for row in rows:
-        if row["name"].lower() in query.lower():
-            matched_ids.append(row["id"])
-            logger.debug(f"  [KG] Matched entity: {row['name']} (id={row['id']})")
+        ent_id = row["id"]
+        ent_name = row["name"].lower().strip()
+        ent_type = row["type"].upper()
+
+        # Skip matching if the entity type is not one of the routing types
+        if ent_type not in ROUTING_TYPES:
+            continue
+
+        if not ent_name:
+            continue
+
+        # Regex match with word boundaries and support for simple 's' plurals
+        pattern = r"\b" + re.escape(ent_name) + r"s?\b"
+        if re.search(pattern, q):
+            if ent_id not in matched_ids:
+                matched_ids.append(ent_id)
+                matched_names.append(f"{row['name']} ({ent_type})")
+
+    if matched_names:
+        logger.info(f"[KG Routing] Query matched entities: {', '.join(matched_names)}")
+    else:
+        logger.debug("[KG Routing] Query did not match any routing entities. Skipping graph lookup.")
 
     return matched_ids
 
@@ -27,7 +84,7 @@ def extract_query_entities(query: str, db: Connection) -> list[int]:
 def get_related_doc_ids(
     entity_ids: list[int],
     db: Connection,
-    hops: int = 2,
+    hops: int = 1,
 ) -> set[int]:
     """
     Walk the graph up to `hops` levels from seed entities.

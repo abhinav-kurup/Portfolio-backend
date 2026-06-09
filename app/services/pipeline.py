@@ -11,10 +11,13 @@ from app.services.llm import generate_answer, condense_query
 from app.services.prompts import NO_CONTEXT_RESPONSE, OUT_OF_SCOPE_RESPONSE
 from app.services.retrievel_normalised import retrieve_context
 from app.core.config import settings
-# from app.services.knowledge_graph.retriever import (
-#     extract_query_entities,
-#     get_graph_context_string,
-# )
+from app.services.knowledge_graph.retriever import (
+    extract_query_entities,
+    get_graph_context_string,
+)
+from app.core.logging import setup_logging
+
+logger = setup_logging()
 
 
 def run_chat_pipeline(payload: ChatRequest, db: Connection) -> ChatResponse:
@@ -34,7 +37,8 @@ def run_chat_pipeline(payload: ChatRequest, db: Connection) -> ChatResponse:
             sources=[f"faq:{faq_match['id']}"]
         )
 
-    chunks = retrieve_context(search_query, db, limit=settings.MAX_CHUNKS_RETRIEVED)
+    seed_entity_ids = extract_query_entities(search_query, db)
+    chunks = retrieve_context(search_query, db, seed_entity_ids=seed_entity_ids, limit=settings.MAX_CHUNKS_RETRIEVED)
 
     if not chunks:
         return ChatResponse(**NO_CONTEXT_RESPONSE)
@@ -46,10 +50,11 @@ def run_chat_pipeline(payload: ChatRequest, db: Connection) -> ChatResponse:
     )
 
     # --- NEW: append graph facts to context ---
-    # seed_entity_ids = extract_query_entities(original_query, db)
-    # graph_facts = get_graph_context_string(seed_entity_ids, db)
-    # if graph_facts:
-    #     context = graph_facts + "\n\n" + context
+    # seed_entity_ids is already extracted above
+    graph_facts = get_graph_context_string(seed_entity_ids, db)
+    if graph_facts:
+        logger.info(f"  [KG Context] Injecting {len(graph_facts.splitlines()) - 1} graph facts into LLM context")
+        context = graph_facts + "\n\n" + context
 
     response = generate_answer(original_query, context, history)
 

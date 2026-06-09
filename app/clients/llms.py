@@ -26,7 +26,7 @@ class LLMClient:
                 model=settings.PRIMARY_LLM_MODEL,
                 max_tokens=settings.PRIMARY_LLM_MAX_TOKENS,
                 temperature=0.3,
-                top_p=0.9,
+                # top_p=0.9,
                 timeout=30,
                 api_key=settings.GROK_API_KEY
             )
@@ -35,7 +35,7 @@ class LLMClient:
                 model=settings.FALLBACK_LLM_MODEL,
                 max_tokens=settings.FALLBACK_LLM_MAX_TOKENS,
                 temperature=0.3,
-                top_p=0.9,
+                # top_p=0.9,
                 timeout=30,
                 api_key=settings.GEMINI_API_KEY
             )
@@ -83,7 +83,7 @@ class LLMClient:
             model="llama-3.1-8b-instant",
             temperature=0.1,
             max_tokens=128,
-            top_p=0.8,
+            # top_p=0.8,
             api_key=settings.GROK_API_KEY
         )
         

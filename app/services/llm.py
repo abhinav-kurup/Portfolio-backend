@@ -1,8 +1,7 @@
-# app/services/chat/llm.py
-
 from __future__ import annotations
 
 from app.core.logging import setup_logging
+from typing import Any
 from app.clients.llms import llm_client
 from app.models.chat import ChatResponse
 from app.services.prompts import SYSTEM_PROMPT
@@ -11,9 +10,7 @@ logger = setup_logging()
 
 
 def condense_query(query: str, history: list[Any] = None) -> str:
-    """
-    Rephrase the query based on history to make it standalone for retrieval.
-    """
+    """Rephrase the query based on history to make it standalone for retrieval."""
     if not history:
         return query
     
@@ -30,9 +27,7 @@ def condense_query(query: str, history: list[Any] = None) -> str:
 
 
 def generate_answer(query: str, context: str, history: list[Any] = None) -> ChatResponse:
-    """
-    Generate structured answer using history and context.
-    """
+    """Generate structured answer using history and context."""
     try:
         from app.services.prompts import build_chat_prompt
         response = llm_client.chat(

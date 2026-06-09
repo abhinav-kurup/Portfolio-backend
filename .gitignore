@@ -20,3 +20,12 @@ uv.lock
 .env
 data/contact_submissions.json
 data/chat_logs.json
+.jetro/
+
+.agents/
+.cursor/
+.github/copilot-instructions.md
+.mcp.json
+.windsurfrules
+AGENT.md
+CLAUDE.md

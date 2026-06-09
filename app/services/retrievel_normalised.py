@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 from sqlite3 import Connection
+import json
+import re
 
 from app.clients.embeddings import embeddings_client
 from app.utils.similarity import serialize_vector
 from app.models.chat import RetrievedChunk
 from app.core.logging import setup_logging
-# from app.services.knowledge_graph.retriever import (
-#     extract_query_entities,
-#     get_related_doc_ids,
-# )
+from app.services.knowledge_graph.retriever import (
+    extract_query_entities,
+    get_related_doc_ids,
+)
+from app.clients.reranker import reranker_client
 
 logger = setup_logging()
 
 SEMANTIC_WEIGHT = 0.7
 LEXICAL_WEIGHT = 0.3
-# GRAPH_BOOST = 0.15
 
 
 def _vector_search(
@@ -50,7 +52,6 @@ def _vector_search(
 
     results: dict[int, RetrievedChunk] = {}
 
-    import json
     for row in rows:
         similarity = 1.0 - float(row["distance"])
         metadata_dict = json.loads(row["metadata"]) if row["metadata"] else {}
@@ -78,8 +79,6 @@ def _fts_search(
     FTS5 keyword search.
     Returns {doc_id: normalized_bm25_score}
     """
-    import re
-    # Clean the query for FTS to avoid syntax errors with special chars like ? or *
     clean_query = re.sub(r'[^\w\s]', ' ', query).strip()
     if not clean_query:
         return {}
@@ -130,41 +129,48 @@ def _fts_search(
 def retrieve_context(
     query: str,
     db: Connection,
+    seed_entity_ids: list[int] = None,
     limit: int = 3,
 ) -> list[RetrievedChunk]:
     """
-    Hybrid retrieval:
-    1. semantic search
-    2. lexical search
-    3. normalize scores
-    4. weighted fusion
+    Hybrid retrieval with Cross-Encoder reranking:
+    1. Semantic search
+    2. Lexical search
+    3. Graph relationship candidate extraction (metadata-driven)
+    4. Reciprocal / Weighted fusion
+    5. Top 20 Candidates pass to local Cross-Encoder reranker
+    6. Return top-k reranked results
     """
     query = query.strip()
     if not query:
         return []
 
-    top_k = limit * 2
+    # Fetch a wider candidate pool for the reranker to evaluate
+    retrieval_k = 15
 
-    semantic_results = _vector_search(db, query, top_k)
-    lexical_scores = _fts_search(db, query, top_k)
+    semantic_results = _vector_search(db, query, retrieval_k)
+    lexical_scores = _fts_search(db, query, retrieval_k)
 
-    if not semantic_results and not lexical_scores:
+    # Gather graph candidates based on query routing matching
+    if seed_entity_ids is None:
+        seed_entity_ids = extract_query_entities(query, db)
+    graph_doc_ids = get_related_doc_ids(seed_entity_ids, db)
+
+    # Merge all unique candidate IDs
+    candidate_ids = set(semantic_results.keys()) | set(lexical_scores.keys()) | graph_doc_ids
+
+    if not candidate_ids:
         return []
 
-    merged: dict[int, RetrievedChunk] = {}
+    merged_candidates: list[dict] = []
 
-    candidate_ids = set(semantic_results.keys()) | set(lexical_scores.keys())
-
-    # --- NEW: get graph-connected doc ids ---
-    # seed_entity_ids = extract_query_entities(query, db)
-    # graph_doc_ids   = get_related_doc_ids(seed_entity_ids, db)
-
+    # Compile properties and compute initial weighted hybrid score for sorting
     for doc_id in candidate_ids:
         semantic = semantic_results.get(doc_id, {}).get("score", 0.0)
         lexical = lexical_scores.get(doc_id, 0.0)
 
         if doc_id in semantic_results:
-            doc = semantic_results[doc_id]
+            doc = dict(semantic_results[doc_id])
         else:
             row = db.execute(
                 """
@@ -178,9 +184,7 @@ def retrieve_context(
             if row is None:
                 continue
 
-            import json
             metadata_dict = json.loads(row["metadata"]) if row["metadata"] else {}
-
             doc = {
                 "id": row["id"],
                 "title": row["title"],
@@ -189,21 +193,21 @@ def retrieve_context(
                 "score": 0.0,
             }
 
+        # Weighted hybrid score calculation
         hybrid_score = (SEMANTIC_WEIGHT * semantic) + (LEXICAL_WEIGHT * lexical)
-
-        # --- NEW: boost docs connected via the knowledge graph ---
-        # if doc_id in graph_doc_ids:
-        #     hybrid_score = min(1.0, hybrid_score + GRAPH_BOOST)
-        #     logger.debug(f"  [KG Boost] doc_id={doc_id} boosted to {hybrid_score:.4f}")
-
         doc["score"] = round(hybrid_score, 4)
+        merged_candidates.append(doc)
 
-        merged[doc_id] = doc
-
-    ranked = sorted(merged.values(), key=lambda x: x["score"], reverse=True)
-    final_results = ranked[:limit]
+    # Sort candidates by hybrid score and select Top 20 for reranker
+    merged_candidates.sort(key=lambda x: x["score"], reverse=True)
+    top_candidates = merged_candidates[:20]
     
-    logger.info(f"Final chunks sent to LLM ({len(final_results)}):")
+    logger.info(f"Fused retrieval produced {len(merged_candidates)} candidates. Routing top {len(top_candidates)} to Reranker.")
+
+    # Run local Cross-Encoder reranker
+    final_results = reranker_client.rerank(query, top_candidates, top_n=limit)
+    
+    logger.info(f"Final chunks sent to LLM after Cross-Encoder reranking ({len(final_results)}):")
     for doc in final_results:
         logger.info(f"  [Final] ID: {doc['id']} | Score: {doc['score']} | Title: {doc['title']}")
         

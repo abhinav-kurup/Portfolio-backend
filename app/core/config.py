@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # llm
     PRIMARY_LLM_PROVIDER: str = "groq"         
-    PRIMARY_LLM_MODEL: str = "openai/gpt-oss-120b"
+    PRIMARY_LLM_MODEL: str = "qwen/qwen3-32b"
     PRIMARY_LLM_MAX_TOKENS: int = 1000
     GROK_API_KEY: str = "None"
 
@@ -28,11 +28,12 @@ class Settings(BaseSettings):
     # embeddings
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"  
     EMBEDDING_DIMENSIONS: int = 384
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # faq
     FAQ_SIMILARITY_THRESHOLD: float = 0.85    
     # retrieval
-    MAX_CHUNKS_RETRIEVED: int = 3
+    MAX_CHUNKS_RETRIEVED: int = 5
 
     # security
     ADMIN_API_KEY: str = "default_admin_key"

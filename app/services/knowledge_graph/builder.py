@@ -1,120 +1,110 @@
 from __future__ import annotations
 
 import json
-import re
 from sqlite3 import Connection
-from pydantic import BaseModel, Field
-
-from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
-from app.core.config import settings
 from app.core.logging import setup_logging
 
 logger = setup_logging()
 
-class Entity(BaseModel):
-    name: str = Field(description="Name of the entity, exact string from text.")
-    type: str = Field(description="Type of entity: PERSON, SKILL, PROJECT, TECHNOLOGY, COMPANY, or OTHER")
 
-class Relation(BaseModel):
-    subject: str = Field(description="Subject entity name")
-    predicate: str = Field(description="Relationship verb (lowercase): uses, built, works_at, knows, led, etc.")
-    object: str = Field(description="Object entity name")
-
-class GraphExtraction(BaseModel):
-    entities: list[Entity]
-    relations: list[Relation]
-
-EXTRACTION_PROMPT = """
-Extract entities and relationships from the text below.
-
-Rules:
-- Entity names must be exact strings from the text
-- Predicates should be lowercase verbs: "uses", "built", "works_at", "knows", "led"
-- Only extract high-confidence triples
-
-Text:
-{text}
-"""
-
-def extract_graph(text: str) -> dict:
-    """Call LLM to extract entities + relations from a document chunk."""
-    if settings.PRIMARY_LLM_PROVIDER == "groq":
-        llm = ChatGroq(
-            model=settings.PRIMARY_LLM_MODEL,
-            max_tokens=1000,
-            temperature=0.0,
-            api_key=settings.GROK_API_KEY
-        )
-    else:
-        llm = ChatGoogleGenerativeAI(
-            model=settings.PRIMARY_LLM_MODEL,
-            max_tokens=1000,
-            temperature=0.0,
-            api_key=settings.GROK_API_KEY
-        )
-        
-    structured_llm = llm.with_structured_output(GraphExtraction)
-    prompt = EXTRACTION_PROMPT.format(text=text[:3000])
+def index_document_graph(doc_id: int, db: Connection) -> None:
+    """
+    Builds the knowledge graph relations deterministically from the document's metadata.
+    Does not use LLM calls.
+    """
+    # 1. Fetch document title, type and metadata
+    row = db.execute(
+        "SELECT title, doc_type, metadata FROM documents WHERE id = ?", [doc_id]
+    ).fetchone()
     
-    try:
-        response = structured_llm.invoke(prompt)
-        return response.model_dump()
-    except Exception as e:
-        logger.error(f"Failed to extract graph using structured output: {e}")
-        return {"entities": [], "relations": []}
-
-
-def index_document_graph(doc_id: int, content: str, db: Connection) -> None:
-    """
-    Extract and store graph triples for a document.
-    Call this from your existing document ingest pipeline.
-    """
-    try:
-        graph = extract_graph(content)
-    except Exception as e:
-        logger.warning(f"Graph extraction failed for doc {doc_id}: {e}")
+    if not row:
+        logger.warning(f"Could not find document with id {doc_id} to index graph.")
         return
 
-    entity_name_to_id: dict[str, int] = {}
+    title = row["title"]
+    doc_type = row["doc_type"].upper()  # 'PROJECT', 'SKILL', etc.
+    
+    try:
+        metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+    except Exception as e:
+        logger.error(f"Failed to parse metadata JSON for doc {doc_id}: {e}")
+        metadata = {}
 
-    # Upsert entities
-    for ent in graph.get("entities", []):
-        name = ent["name"].strip()
-        etype = ent.get("type", "OTHER")
-        if not name:
-            continue
+    # 2. Clean existing entities and relations for this document to support clean updates
+    db.execute("DELETE FROM kg_relations WHERE doc_id = ?", [doc_id])
+    db.execute("DELETE FROM kg_entities WHERE doc_id = ?", [doc_id])
 
-        cursor = db.execute(
-            """
-            INSERT INTO kg_entities (name, type, doc_id)
-            VALUES (?, ?, ?)
-            ON CONFLICT(name, doc_id) DO UPDATE SET type = excluded.type
-            RETURNING id
-            """,
-            [name, etype, doc_id],
-        )
-        row = cursor.fetchone()
-        if row:
-            entity_name_to_id[name] = row["id"]
+    # 3. Create the seed/source entity (the project or document itself)
+    cursor = db.execute(
+        """
+        INSERT INTO kg_entities (name, type, doc_id)
+        VALUES (?, ?, ?)
+        ON CONFLICT(name, doc_id) DO UPDATE SET type = excluded.type
+        RETURNING id
+        """,
+        [title, doc_type, doc_id],
+    )
+    seed_row = cursor.fetchone()
+    if not seed_row:
+        logger.error(f"Failed to insert source entity {title} for doc {doc_id}")
+        return
+        
+    seed_entity_id = seed_row["id"]
 
-    # Insert relations
-    for rel in graph.get("relations", []):
-        subj_id = entity_name_to_id.get(rel["subject"])
-        obj_id  = entity_name_to_id.get(rel["object"])
-        if not subj_id or not obj_id:
-            continue  # skip if entity wasn't found
+    # Define mappings of metadata list keys to entity types and relationship predicates
+    mappings = [
+        ("technologies", "TECHNOLOGY", "uses"),
+        ("concepts", "CONCEPT", "involves"),
+        ("skills", "SKILL", "demonstrates"),
+        ("domains", "DOMAIN", "belongs_to"),
+    ]
 
-        db.execute(
-            """
-            INSERT OR IGNORE INTO kg_relations (subject_id, predicate, object_id, doc_id)
-            VALUES (?, ?, ?, ?)
-            """,
-            [subj_id, rel["predicate"], obj_id, doc_id],
-        )
+    entity_count = 0
+    relation_count = 0
+
+    # 4. Deterministically populate entities and relations from metadata fields
+    for meta_key, entity_type, predicate in mappings:
+        items = metadata.get(meta_key, [])
+        if not isinstance(items, list):
+            if isinstance(items, str) and items.strip():
+                items = [items]
+            else:
+                items = []
+
+        for item in items:
+            name = item.strip()
+            if not name:
+                continue
+
+            # Upsert target entity
+            target_cursor = db.execute(
+                """
+                INSERT INTO kg_entities (name, type, doc_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(name, doc_id) DO UPDATE SET type = excluded.type
+                RETURNING id
+                """,
+                [name, entity_type, doc_id],
+            )
+            target_row = target_cursor.fetchone()
+            if not target_row:
+                continue
+            
+            target_entity_id = target_row["id"]
+            entity_count += 1
+
+            # Insert relationship link
+            db.execute(
+                """
+                INSERT OR IGNORE INTO kg_relations (subject_id, predicate, object_id, doc_id)
+                VALUES (?, ?, ?, ?)
+                """,
+                [seed_entity_id, predicate, target_entity_id, doc_id],
+            )
+            relation_count += 1
 
     db.commit()
     logger.info(
-        f"Indexed graph for doc {doc_id}: "
-        f"{len(entity_name_to_id)} entities, {len(graph.get('relations', []))} relations"
+        f"Indexed deterministic graph for doc {doc_id} ('{title}'): "
+        f"{entity_count} entities, {relation_count} relations"
     )
