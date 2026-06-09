@@ -100,8 +100,7 @@ def seed_documents(conn):
 
             # Update Knowledge Graph
             from app.services.knowledge_graph.builder import index_document_graph
-            graph_input = f"Title: {doc['title']}\nKeywords: {keywords_str}\nContent: {doc['content']}"
-            index_document_graph(doc_id=existing["id"], content=graph_input, db=conn)
+            index_document_graph(doc_id=existing["id"], db=conn)
 
             print(f"  Updated: {doc['title']}")
 
@@ -127,8 +126,7 @@ def seed_documents(conn):
 
             # Index Knowledge Graph
             from app.services.knowledge_graph.builder import index_document_graph
-            graph_input = f"Title: {doc['title']}\nKeywords: {keywords_str}\nContent: {doc['content']}"
-            index_document_graph(doc_id=doc_id, content=graph_input, db=conn)
+            index_document_graph(doc_id=doc_id, db=conn)
 
             print(f"  Inserted: {doc['title']}")
 

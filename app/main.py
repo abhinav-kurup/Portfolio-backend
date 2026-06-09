@@ -12,14 +12,12 @@ logger = setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
     logger.info("Starting up...")
     create_schema()
     logger.info("Database initialized.")
     run_seed()
     logger.info("Seed complete.")
     yield
-    # shutdown
     logger.info("Shutting down...")
 
 app = FastAPI(
@@ -36,7 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# routers
 app.include_router(chat.router,  prefix="/api",  tags=["chat"])
 app.include_router(contact.router, prefix="/api", tags=["contact"])
 # app.include_router(blogs.router, prefix="/api/v1/blogs", tags=["blogs"])
@@ -46,6 +43,4 @@ app.include_router(contact.router, prefix="/api", tags=["contact"])
 def health():
     return {
         "status": "healthy",
-        # "version": "1.0.0",
-        # "environment": settings.APP_ENV
-    }
+        }

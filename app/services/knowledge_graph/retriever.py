@@ -1,70 +1,82 @@
 from __future__ import annotations
 
+import re
 from sqlite3 import Connection
 from app.core.logging import setup_logging
-from pydantic import BaseModel, Field
-from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
-from app.core.config import settings
 
 logger = setup_logging()
 
-class QueryEntities(BaseModel):
-    entities: list[str] = Field(description="List of key entities extracted from the query. Focus on names of people, projects, skills, technologies, and core concepts.")
+# Aliases to map common variations to the canonical database names
+ALIASES = {
+    "postgres": "postgresql",
+    "js": "javascript",
+    "ts": "typescript",
+    "crdts": "crdt",
+    "websockets": "websocket",
+    "neural networks": "llms",
+    "large language models": "llms",
+    "llm": "llms",
+    "ai": "applied ai",
+    "doc QA": "document QA",
+    "cassandras": "cassandra",
+}
+
+# Entity types that trigger graph routing
+ROUTING_TYPES = {"TECHNOLOGY", "CONCEPT", "SKILL", "DOMAIN"}
+
 
 def extract_query_entities(query: str, db: Connection) -> list[int]:
     """
-    LLM-based NER: use an LLM to extract entities from the query, 
-    then match them against the kg_entities table.
+    Deterministic NER matching: Matches query against entities in the database
+    using case-insensitive substring and regex word boundaries.
+    Only returns entity IDs of types TECHNOLOGY, CONCEPT, SKILL, DOMAIN (graph routing).
     """
-    provider = settings.PRIMARY_LLM_PROVIDER
-    model = settings.PRIMARY_LLM_MODEL
+    query = query.strip()
+    if not query:
+        return []
 
-    if provider == "groq":
-        llm = ChatGroq(
-            model=model,
-            max_tokens=250,
-            temperature=0.0,
-            api_key=settings.GROK_API_KEY
-        )
-    elif provider == "google":
-        llm = ChatGoogleGenerativeAI(
-            model=model,
-            max_tokens=200,
-            temperature=0.0,
-            api_key=settings.GEMINI_API_KEY
-        )
-    else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
-        
-    structured_llm = llm.with_structured_output(QueryEntities)
-    prompt = f"Extract the key entities from the following query to use for a knowledge graph search:\n\nQuery: {query}"
+    # 1. Fetch all unique entity names and types from database
+    rows = db.execute(
+        "SELECT id, name, type FROM kg_entities"
+    ).fetchall()
+
+    if not rows:
+        return []
+
+    q = query.lower()
     
-    extracted_names = []
-    try:
-        response = structured_llm.invoke(prompt)
-        extracted_names = [e.lower() for e in response.entities]
-        logger.info(f"  [KG] LLM extracted entities: {extracted_names}")
-    except Exception as e:
-        logger.error(f"Failed to extract entities using LLM: {e}")
-        return []
-
-    if not extracted_names:
-        return []
-
-    rows = db.execute("SELECT id, name FROM kg_entities").fetchall()
+    # 2. Check for alias matches and rewrite query tokens if needed
+    for alias, canonical in ALIASES.items():
+        if alias in q:
+            q += f" {canonical}"  # Append canonical name to help match it below
 
     matched_ids = []
+    matched_names = []
+
+    # 3. Match each database entity against the query
     for row in rows:
-        db_name = row["name"].lower()
-        # Strict match but allowing for simple plurals
-        if (db_name in extracted_names or 
-            db_name + "s" in extracted_names or 
-            db_name.rstrip("s") in extracted_names):
-            
-            if row["id"] not in matched_ids:
-                matched_ids.append(row["id"])
-                logger.info(f"  [KG] Matched DB entity: {row['name']} (id={row['id']})")
+        ent_id = row["id"]
+        ent_name = row["name"].lower().strip()
+        ent_type = row["type"].upper()
+
+        # Skip matching if the entity type is not one of the routing types
+        if ent_type not in ROUTING_TYPES:
+            continue
+
+        if not ent_name:
+            continue
+
+        # Regex match with word boundaries and support for simple 's' plurals
+        pattern = r"\b" + re.escape(ent_name) + r"s?\b"
+        if re.search(pattern, q):
+            if ent_id not in matched_ids:
+                matched_ids.append(ent_id)
+                matched_names.append(f"{row['name']} ({ent_type})")
+
+    if matched_names:
+        logger.info(f"[KG Routing] Query matched entities: {', '.join(matched_names)}")
+    else:
+        logger.debug("[KG Routing] Query did not match any routing entities. Skipping graph lookup.")
 
     return matched_ids
 

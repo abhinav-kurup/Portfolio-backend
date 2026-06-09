@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # embeddings
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"  
     EMBEDDING_DIMENSIONS: int = 384
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # faq
     FAQ_SIMILARITY_THRESHOLD: float = 0.85    
