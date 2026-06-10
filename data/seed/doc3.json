@@ -39,56 +39,55 @@
             "priority": "high"
         }
     },
-    {
-        "doc_type": "project",
-        "title": "DocuMind",
-        "content": "Abhinav Kurup built DocuMind, an AI-powered document intelligence system that enables users to ask natural language questions over uploaded documents and receive accurate, citation-backed answers. Status: Personal proof-of-concept project.\n\nThe primary goal of DocuMind was to explore how LLM-powered systems can reliably reason over private document collections while remaining grounded in source material. Rather than implementing a simple Retrieval-Augmented Generation (RAG) pipeline, DocuMind uses LangGraph to orchestrate a stateful multi-step AI workflow consisting of query routing, retrieval, context extraction, evidence ranking, and response generation. Each stage operates independently, making the overall AI pipeline more robust and easier to debug.\n\nRetrieval quality was the biggest challenge. Broad or ambiguous user questions often cause traditional RAG systems to retrieve fragmented context. To address this, DocuMind performs query planning, where complex questions are decomposed into smaller retrieval-focused sub-queries before hitting ChromaDB. Retrieved chunks are then deduplicated, ranked, and consolidated before prompt assembly, ensuring the LLM receives higher quality evidence.\n\nDocuMind was designed around grounded AI generation. ChromaDB stores each chunk alongside metadata such as source file, page number, and chunk index, allowing responses to be traced back to specific source locations. Source-aware prompting and citation guardrails ensure that generated answers remain tied to retrieved evidence rather than unsupported model knowledge.\n\nThe project explores several modern AI engineering concepts including Retrieval-Augmented Generation (RAG), LLM orchestration, agentic workflows, query planning, context engineering, evidence ranking, and grounded generation. Through DocuMind, Abhinav gained hands-on experience building AI systems that combine retrieval, reasoning, and generation while maintaining factual accuracy and explainability.\n\nStack: FastAPI, LangGraph, LangChain, ChromaDB, Python, LLMs.",
-        "metadata": {
-            "project": "DocuMind",
-            "technologies": [
-                "FastAPI",
-                "LangGraph",
-                "LangChain",
-                "ChromaDB",
-                "Python",
-                "LLMs"
-            ],
-            "concepts": [
-                "RAG",
-                "Retrieval-Augmented Generation",
-                "Grounded Generation",
-                "Query Planning",
-                "Stateful AI Pipelines",
-                "Agentic Workflows",
-                "LLM Orchestration",
-                "Context Engineering",
-                "Evidence Ranking"
-            ],
-            "skills": [
-                "AI Engineering",
-                "LLM Engineering",
-                "Information Retrieval",
-                "Prompt Engineering",
-                "Pipeline Design"
-            ],
-            "domains": [
-                "AI",
-                "Document Intelligence",
-                "Knowledge Retrieval"
-            ],
-            "keywords": [
-                "document QA",
-                "vector search",
-                "citation guardrails",
-                "LLM applications",
-                "agentic AI",
-                "RAG systems",
-                "grounded AI"
-            ],
-            "production": false,
-            "priority": "high"
-        }
-    },
+{
+    "doc_type": "project",
+    "title": "DocuMind",
+    "content": "Abhinav Kurup built DocuMind, an AI-powered document intelligence platform that delivers grounded, citation-backed answers over private document collections. Status: Personal proof-of-concept project.\n\nDocuMind implements an Agentic RAG architecture using LangGraph and Pydantic AI to orchestrate query planning, hybrid retrieval, reranking, context assembly, and structured response generation through a stateful workflow.\n\nTo improve retrieval quality, the system decomposes complex user queries into semantic sub-queries before retrieval. It combines vector search using ChromaDB with BM25 keyword search through Hybrid Retrieval, ensuring both semantic understanding and exact-match recall.\n\nRetrieved candidates are deduplicated and reranked using a Cross-Encoder model to maximize relevance before context is passed to the LLM. This significantly improves answer quality compared to traditional vector-only RAG pipelines.\n\nGrounded generation is enforced through source-aware prompting, citation guardrails, and schema-validated outputs powered by Pydantic AI. Responses include confidence scores and source citations, improving explainability and reducing hallucinations.\n\nThe platform also supports multimodal interactions through Speech-to-Text using Faster-Whisper and local Text-to-Speech generation using SpeechT5 and HiFi-GAN, enabling voice-native document question answering.\n\nAdditional capabilities include tool calling for mathematical reasoning, dynamic model routing across Gemini, Groq, Ollama, and Google models, metadata-aware retrieval, and scalable retrieval pipelines.\n\nStack: FastAPI, LangGraph, Pydantic AI, ChromaDB, Sentence Transformers, BM25, Faster-Whisper, SpeechT5, HiFi-GAN, Python, LLMs.",
+    "metadata": {
+        "project": "DocuMind",
+        "technologies": [
+            "FastAPI",
+            "LangGraph",
+            "Pydantic AI",
+            "ChromaDB",
+            "Sentence Transformers",
+            "Faster-Whisper"
+        ],
+        "concepts": [
+            "Agentic RAG",
+            "Hybrid Retrieval",
+            "Cross-Encoder Reranking",
+            "Query Planning",
+            "Grounded Generation",
+            "LLM Orchestration"
+        ],
+        "skills": [
+            "AI Engineering",
+            "LLM Engineering",
+            "Information Retrieval",
+            "Search Relevance",
+            "Multimodal AI"
+        ],
+        "domains": [
+            "Document Intelligence",
+            "Knowledge Retrieval"
+        ],
+        "keywords": [
+            "agentic rag",
+            "hybrid search",
+            "bm25",
+            "cross-encoder reranking",
+            "query decomposition",
+            "pydantic ai",
+            "tool calling",
+            "speech-to-text",
+            "text-to-speech",
+            "citation-backed answers"
+        ],
+        "production": false,
+        "priority": "high"
+    }
+},
     {
         "doc_type": "project",
         "title": "E-Beat",
