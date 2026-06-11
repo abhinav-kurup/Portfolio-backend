@@ -24,19 +24,19 @@ def condense_query(query: str, history: list[Any] = None) -> str:
 
 
 
-def generate_answer(query: str, context: str, history: list[Any] = None) -> ChatResponse:
-    """Generate structured answer using history and context."""
+def generate_answer(query: str, context: str) -> ChatResponse:
+    """Generate structured answer from retrieved context (history handled at condense step)."""
     try:
         from app.services.prompts import build_chat_prompt
         response = llm_client.chat(
-            system_promt=SYSTEM_PROMPT,
+            system_prompt=SYSTEM_PROMPT,
             user_prompt=build_chat_prompt(query, context),
-            history=history
         )
 
         return ChatResponse(
             response=response.response,
             confidence=response.confidence,
+            metadata=response.metadata,
             sources=response.sources,
             # follow_ups=response.metadata.get("follow_ups", []),
             # in_scope=True,

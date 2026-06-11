@@ -41,9 +41,9 @@ class LLMClient:
             )
         return model.with_structured_output(ChatResponse)
 
-    def chat(self, system_promt: str, user_prompt: str, history: list[Any] = None) -> ChatResponse:
+    def chat(self, system_prompt: str, user_prompt: str, history: list[Any] = None) -> ChatResponse:
         """Weighted random selection of models for the final answer."""
-        messages = [("system", system_promt)]
+        messages = [("system", system_prompt)]
         if history:
             for msg in history:
                 messages.append((msg.role, msg.content))

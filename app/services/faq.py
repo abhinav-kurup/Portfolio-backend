@@ -7,11 +7,10 @@ from app.utils.similarity import serialize_vector
 
 
 from app.models.chat import FAQMatch
+from app.core.config import settings
 from app.core.logging import setup_logging
 
 logger = setup_logging()
-
-FAQ_SIMILARITY_THRESHOLD = 0.88
 
 
 def find_faq_match(query: str, db: Connection) -> FAQMatch | None:
@@ -47,9 +46,10 @@ def find_faq_match(query: str, db: Connection) -> FAQMatch | None:
         return None
 
     similarity = 1 - row["score"]
-    logger.info(f"Best FAQ match: '{row['question']}' | Similarity: {round(similarity, 4)} (Threshold: {FAQ_SIMILARITY_THRESHOLD})")
+    threshold = settings.FAQ_SIMILARITY_THRESHOLD
+    logger.info(f"Best FAQ match: '{row['question']}' | Similarity: {round(similarity, 4)} (Threshold: {threshold})")
 
-    if similarity < FAQ_SIMILARITY_THRESHOLD:
+    if similarity < threshold:
         logger.info("FAQ similarity below threshold, proceeding to full retrieval.")
         return None
 
