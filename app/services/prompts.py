@@ -35,11 +35,13 @@ It should be optimized for a search engine or a RAG retrieval system.
 If the follow-up question is already a standalone question, just repeat it exactly.
 
 Rules:
-- Do not answer the question
-- Do not add information not present in the conversation
+- Do not answer the question.
+- Do not add information not present in the conversation.
 - Never add the name "Abhinav Kurup" or "Abhinav" to the question. Since this is a portfolio, assume all projects and experience belong to the owner.
-- Only output the rephrased question
+- If the question is not related to Abhinav's portfolio, work, experience, projects, skills, background, or a simple greeting/pleasantry, output exactly: OUT_OF_SCOPE.
+- Only output the rephrased question or the word OUT_OF_SCOPE. Do not include any other text, explanations, or quotes.
 """
+
 
 
 def build_chat_prompt(query: str, context: str) -> str:

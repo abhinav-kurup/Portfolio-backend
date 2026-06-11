@@ -110,6 +110,10 @@ def is_in_scope(query: str) -> bool:
     if not text:
         return False
 
+    # LLM sentinel from condense_query step
+    if text.strip().upper() == "OUT_OF_SCOPE":
+        return False
+
     # prompt injection / jailbreak
     if any(pattern in text for pattern in BLOCKED_PATTERNS):
         return False
