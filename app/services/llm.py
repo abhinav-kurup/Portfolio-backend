@@ -11,19 +11,17 @@ logger = setup_logging()
 
 def condense_query(query: str, history: list[Any] = None) -> str:
     """Rephrase the query based on history to make it standalone for retrieval."""
-    if not history:
-        return query
-    
     from app.services.prompts import CONDENSE_PROMPT
     
     standalone_query = llm_client.raw_chat(
         system_prompt=CONDENSE_PROMPT,
         user_prompt=f"Follow-up question: {query}",
-        history=history
+        history=history or []
     )
     
     logger.info("Condensed query: %s", standalone_query)
-    return standalone_query 
+    return standalone_query
+
 
 
 def generate_answer(query: str, context: str, history: list[Any] = None) -> ChatResponse:
