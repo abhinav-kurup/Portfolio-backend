@@ -8,6 +8,7 @@ logger = setup_logging()
 
 # Aliases to map common variations to the canonical database names
 ALIASES = {
+    "cloud": "aws",
     "postgres": "postgresql",
     "js": "javascript",
     "ts": "typescript",

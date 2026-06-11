@@ -56,7 +56,7 @@ def run_chat_pipeline(payload: ChatRequest, db: Connection) -> ChatResponse:
         logger.info(f"  [KG Context] Injecting {len(graph_facts.splitlines()) - 1} graph facts into LLM context")
         context = graph_facts + "\n\n" + context
 
-    response = generate_answer(original_query, context, history)
+    response = generate_answer(original_query, context)
 
     if not response.sources:
         response.sources = [f"doc:{chunk['id']}" for chunk in chunks]
