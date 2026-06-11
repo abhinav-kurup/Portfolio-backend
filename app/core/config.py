@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # llm
     PRIMARY_LLM_PROVIDER: str = "groq"         
-    PRIMARY_LLM_MODEL: str = "qwen/qwen3-32b"
+    PRIMARY_LLM_MODEL: str = "llama-3.3-70b-versatile"
     PRIMARY_LLM_MAX_TOKENS: int = 1000
     GROK_API_KEY: str = "None"
 
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # faq
-    FAQ_SIMILARITY_THRESHOLD: float = 0.85    
+    FAQ_SIMILARITY_THRESHOLD: float = 0.88    
     # retrieval
     MAX_CHUNKS_RETRIEVED: int = 5
 
