@@ -32,7 +32,6 @@ def chat(
 ) -> ChatResponse:
 
     logger.info("Chat request received", extra={"payload": payload})
-    print("PAYLOAD",payload)
     response = run_chat_pipeline(payload, db)
     log_interaction(payload, response)
     return response
